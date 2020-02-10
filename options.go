@@ -1,0 +1,223 @@
+package di
+
+// Option is a functional option that configures container. If you don't know about functional
+// options, see https://dave.cheney.net/2014/10/17/functional-options-for-friendly-apis.
+// Below presented all possible options with their description:
+//
+// 	- di.Provide - provide constructors
+//	- di.Invoke - add invocations
+type Option interface {
+	apply(c *Container)
+}
+
+// Provide returns container option that provides type constructor to container with their options. Provide options
+// modify injection behaviour: di.WithName adds name to resolved type for identifying, di.As - creates interface
+// alias and interface group. Note that a providing will occur on the Compile() call.
+func Provide(constructor Constructor, options ...ProvideOption) Option {
+	return containerOption(func(c *Container) {
+		c.provides = append(c.provides, constructorOptions{constructor, options})
+	})
+}
+
+// Constructor is a function with follow signature:
+//
+// 		func NewHTTPServer(addr string, handler http.Handler) (server *http.Server, cleanup func(), err error) {
+//			server := &http.Server{
+//				Addr: addr,
+//			}
+//			cleanup = func() {
+//				server.Close()
+//			}
+//			return server, cleanup, nil
+// 		}
+//
+// This constructor function teaches container how to build server. Arguments (addr and handler) in this function
+// is a dependencies. They will be resolved automatically when someone needs a server. Constructor may have unlimited
+// count of dependencies, but note that container should know how build each of them.
+// Second result of this function is a optional cleanup closure. It describes what container will do on type destroying.
+// Third result is a optional error. Sometimes our types cannot be constructed :(
+type Constructor interface{}
+
+// ProvideOption is a functional option interface that modify provide behaviour. See As(), WithName() and Prototype().
+type ProvideOption interface {
+	apply(params *ProvideParams)
+}
+
+// As returns provide option that specifies interfaces for constructor resultant type.
+//
+// INTERFACE USAGE:
+//
+// You can provide type as interface and resolve it later without using of direct implementation.
+// This creates less cohesion of code and promotes be more testable.
+//
+// Create type constructors:
+//
+// 		func NewServeMux() *http.ServeMux {
+// 			return &http.ServeMux{}
+// 		}
+//
+//		func NewServer(handler *http.Handler) *http.Server {
+//			return &http.Server{
+//				Handler: handler,
+//			}
+//		}
+//
+// Build container with di.As provide option:
+//
+//		container, err := di.New(
+//			di.Provide(NewServer),
+//			di.Provide(NewServeMux, di.As(new(http.Handler)),
+//		)
+//		var server *http.Server
+//		container.Resolve(&http.Server)
+//
+// In this example you can see how container inject type *http.ServeMux as http.Handler
+// interface into the server constructor.
+//
+// GROUP USAGE:
+//
+// Container automatically creates group for interfaces. For example, you can use type []http.Handler in
+// previous example.
+//
+//		var handlers []http.Handler
+//		container.Resolve(&handlers)
+//
+// Container checks that provided type implements interface if not cause compile error.
+func As(interfaces ...Interface) ProvideOption {
+	return provideOption(func(params *ProvideParams) {
+		params.Interfaces = append(params.Interfaces, interfaces...)
+	})
+}
+
+// Interface is a pointer to interface, like new(http.Handler). Tell container that provided
+// type may be used as interface.
+type Interface interface{}
+
+// WithName modifies Provide() behavior. It adds name identity for provided type.
+func WithName(name string) ProvideOption {
+	return provideOption(func(params *ProvideParams) {
+		params.Name = name
+	})
+}
+
+// Prototype modifies Provide() behavior. By default, each type resolves as a singleton. This option sets that
+// each type resolving creates a new instance of the type.
+//
+// 		Provide(&http.Server{}, inject.Prototype())
+//
+//   	var server1 *http.Server
+//   	var server2 *http.Server
+//   	container.Resolve(&server1, &server2)
+//
+func Prototype() ProvideOption {
+	return provideOption(func(params *ProvideParams) {
+		params.IsPrototype = true
+	})
+}
+
+// Invoke returns container option that registers container invocation. All invocations will be called on compile stage
+// after dependency graph resolving.
+func Invoke(fn Invocation, options ...InvokeOption) Option {
+	return containerOption(func(c *Container) {
+		c.invocations = append(c.invocations, invocationOptions{fn, options})
+	})
+}
+
+// Invocation is a function whose signature looks like:
+//
+//		func StartServer(server *http.Server) error {
+//			server.ListenAndServe()
+//		}
+//
+// Like a constructor invocation may have unlimited count of arguments and they will be resolved automatically.
+// Also invocation may return optional error.
+type Invocation interface{}
+
+// Options group together container options.
+//
+//   account := di.Options(
+//     di.Provide(NewAccountController),
+//     di.Provide(NewAccountRepository),
+//   )
+//
+//   auth := di.Options(
+//     di.Provide(NewAuthController),
+//     di.Provide(NewAuthRepository),
+//   )
+//
+//   container, _ := New(
+//     account,
+//     auth,
+//   )
+func Options(options ...Option) Option {
+	return containerOption(func(container *Container) {
+		for _, opt := range options {
+			opt.apply(container)
+		}
+	})
+}
+
+// ProvideParams is a `Provide()` method options. Name is a unique identifier of type instance. Provider is a constructor
+// function. Interfaces is a interface that implements a provider result type.
+type ProvideParams struct {
+	Name        string
+	Interfaces  []Interface
+	Parameters  ParameterBag
+	IsPrototype bool
+}
+
+func (p ProvideParams) apply(params *ProvideParams) {
+	*params = p
+}
+
+// InvokeOption
+type InvokeOption interface {
+	apply(params *InvokeParams)
+}
+
+// InvokeParams is a addInvocation parameters.
+type InvokeParams struct {
+	// The function
+	Fn interface{}
+}
+
+func (p InvokeParams) apply(params *InvokeParams) {
+	*params = p
+}
+
+// ExtractOption
+type ExtractOption interface {
+	apply(params *ExtractParams)
+}
+
+// Name specify definition name.
+func Name(name string) ExtractOption {
+	return extractOption(func(params *ExtractParams) {
+		params.Name = name
+	})
+}
+
+// ExtractParams
+type ExtractParams struct {
+	Name string
+}
+
+func (p ExtractParams) apply(params *ExtractParams) {
+	*params = p
+}
+
+type containerOption func(c *Container)
+
+func (o containerOption) apply(c *Container) { o(c) }
+
+type provideOption func(params *ProvideParams)
+
+func (o provideOption) apply(params *ProvideParams) {
+	o(params)
+}
+
+type extractOption func(params *ExtractParams)
+
+func (o extractOption) apply(params *ExtractParams) {
+	o(params)
+}
