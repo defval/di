@@ -4,6 +4,11 @@ import (
 	"reflect"
 )
 
+// isEmbedParameter
+func isEmbedParameter(typ reflect.Type) bool {
+	return typ.Kind() == reflect.Struct && typ.Implements(parameterInterface)
+}
+
 // Parameter is embed helper that indicates that type is a constructor embed parameter.
 type Parameter struct {
 	internalParameter
@@ -12,38 +17,34 @@ type Parameter struct {
 // parameterRequired
 type parameter struct {
 	name     string       // string identifier
-	res      reflect.Type // resultant type
+	typ      reflect.Type // resultant type
 	optional bool         // optional flag
 	embed    bool         // embed flag
 }
 
 // String represents parameter as string.
 func (p parameter) String() string {
-	return key{name: p.name, res: p.res}.String()
+	return id{Name: p.name, Type: p.typ}.String()
 }
 
 // ResolveProvider resolves type in container c.
-func (p parameter) ResolveProvider(c *Container) (internalProvider, bool) {
-	for _, pt := range providerLookupSequence {
-		k := key{
-			name: p.name,
-			res:  p.res,
-			typ:  pt,
-		}
-		if !c.graph.Exists(k) {
-			continue
-		}
-		node := c.graph.Get(k)
-		return node.Value.(internalProvider), true
+func (p parameter) ResolveProvider(c *Container) (provider, bool) {
+	k := id{
+		Name: p.name,
+		Type: p.typ,
 	}
-	return nil, false
+	node, err := c.graph.Node(k)
+	if err != nil {
+		return nil, false
+	}
+	return node.(providerNode).provider, true
 }
 
 // ResolveValue resolves value in container c.
 func (p parameter) ResolveValue(c *Container) (reflect.Value, error) {
 	provider, exists := p.ResolveProvider(c)
 	if !exists && p.optional {
-		return reflect.New(p.res).Elem(), nil
+		return reflect.New(p.typ).Elem(), nil
 	}
 	if !exists {
 		return reflect.Value{}, ErrParameterProviderNotFound{param: p}
@@ -55,17 +56,12 @@ func (p parameter) ResolveValue(c *Container) (reflect.Value, error) {
 	}
 	value, cleanup, err := provider.Provide(values...)
 	if err != nil {
-		return value, ErrParameterProvideFailed{k: provider.Key(), err: err}
+		return value, ErrParameterProvideFailed{id: provider.ID(), err: err}
 	}
 	if cleanup != nil {
 		c.cleanups = append(c.cleanups, cleanup)
 	}
 	return value, nil
-}
-
-// isEmbedParameter
-func isEmbedParameter(typ reflect.Type) bool {
-	return typ.Kind() == reflect.Struct && typ.Implements(parameterInterface)
 }
 
 // internalParameter

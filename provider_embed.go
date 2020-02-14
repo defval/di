@@ -5,47 +5,46 @@ import (
 	"strings"
 )
 
-// createStructProvider
-func newProviderEmbed(p parameter) *providerEmbed {
+// createStructProvider creates embed provider.
+func providerFromEmbedParameter(p parameter) *providerEmbed {
 	var embedType reflect.Type
-	if p.res.Kind() == reflect.Ptr {
-		embedType = p.res.Elem()
+	if p.typ.Kind() == reflect.Ptr {
+		embedType = p.typ.Elem()
 	} else {
-		embedType = p.res
+		embedType = p.typ
 	}
 
 	return &providerEmbed{
-		key: key{
-			name: p.name,
-			res:  p.res,
-			typ:  ptEmbedParameter,
+		id: id{
+			Name: p.name,
+			Type: p.typ,
 		},
-		embedType:  embedType,
-		embedValue: reflect.New(embedType).Elem(),
+		typ: embedType,
+		val: reflect.New(embedType).Elem(),
 	}
 }
 
 type providerEmbed struct {
-	key        key
-	embedType  reflect.Type
-	embedValue reflect.Value
+	id  id
+	typ reflect.Type
+	val reflect.Value
 }
 
-func (p *providerEmbed) Key() key {
-	return p.key
+func (p *providerEmbed) ID() id {
+	return p.id
 }
 
 func (p *providerEmbed) ParameterList() parameterList {
 	var plist parameterList
-	for i := 0; i < p.embedType.NumField(); i++ {
+	for i := 0; i < p.typ.NumField(); i++ {
 		name, optional, isDependency := p.inspectFieldTag(i)
 		if !isDependency {
 			continue
 		}
-		field := p.embedType.Field(i)
+		field := p.typ.Field(i)
 		plist = append(plist, parameter{
 			name:     name,
-			res:      field.Type,
+			typ:      field.Type,
 			optional: optional,
 			embed:    isEmbedParameter(field.Type),
 		})
@@ -54,22 +53,22 @@ func (p *providerEmbed) ParameterList() parameterList {
 }
 
 func (p *providerEmbed) Provide(values ...reflect.Value) (reflect.Value, func(), error) {
-	for i, offset := 0, 0; i < p.embedType.NumField(); i++ {
+	for i, offset := 0, 0; i < p.typ.NumField(); i++ {
 		_, _, isDependency := p.inspectFieldTag(i)
 		if !isDependency {
 			offset++
 			continue
 		}
 
-		p.embedValue.Field(i).Set(values[i-offset])
+		p.val.Field(i).Set(values[i-offset])
 	}
 
-	return p.embedValue, nil, nil
+	return p.val, nil, nil
 }
 
 func (p *providerEmbed) inspectFieldTag(num int) (name string, optional bool, isDependency bool) {
-	fieldType := p.embedType.Field(num)
-	fieldValue := p.embedValue.Field(num)
+	fieldType := p.typ.Field(num)
+	fieldValue := p.val.Field(num)
 	tag, tagExists := fieldType.Tag.Lookup("di")
 	if !tagExists || !fieldValue.CanSet() {
 		return "", false, false

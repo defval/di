@@ -8,87 +8,89 @@ import (
 	"github.com/goava/di/internal/reflection"
 )
 
+// ctorType describes types of constructor provider.
 type ctorType int
 
 const (
-	ctorUnknown      ctorType = iota // unknown ctor signature
-	ctorStd                          // (deps) (result)
-	ctorError                        // (deps) (result, error)
-	ctorCleanup                      // (deps) (result, cleanup)
-	ctorCleanupError                 // (deps) (result, cleanup, error)
+	ctorUnknown      ctorType = iota
+	ctorStd                   // (deps) (result)
+	ctorError                 // (deps) (result, error)
+	ctorCleanup               // (deps) (result, cleanup)
+	ctorCleanupError          // (deps) (result, cleanup, error)
 )
 
-// newProviderConstructor
-func newProviderConstructor(name string, ctor interface{}) *providerConstructor {
-	if ctor == nil {
-		panicf("The constructor must be a function like `func([dep1, dep2, ...]) (<result>, [cleanup, error])`, got `%s`", "nil")
-	}
-	if !reflection.IsFunc(ctor) {
-		panicf("The constructor must be a function like `func([dep1, dep2, ...]) (<result>, [cleanup, error])`, got `%s`", reflect.ValueOf(ctor).Type())
-	}
-	fn := reflection.InspectFunction(ctor)
-	ctorType := determineCtorType(fn)
-	return &providerConstructor{
-		name:     name,
-		ctor:     fn,
-		ctorType: ctorType,
-	}
-}
-
-// providerConstructor
+// providerConstructor is a provider that can handle constructor functions.
+// Type of this provider provides type with function call.
 type providerConstructor struct {
 	name     string
-	ctor     *reflection.Func
+	ctor     reflection.Func
 	ctorType ctorType
 	clean    *reflection.Func
 }
 
-func (c providerConstructor) Key() key {
-	return key{
-		name: c.name,
-		res:  c.ctor.Out(0),
-		typ:  ptConstructor,
+// newProviderConstructor creates new constructor provider with name as additional identity key.
+func newProviderConstructor(name string, constructor interface{}) (*providerConstructor, error) {
+	if constructor == nil {
+		return nil, fmt.Errorf("constructor must be a function like func([dep1, dep2, ...]) (<result>, [cleanup, error]), got nil")
+	}
+	fn, isFunc := reflection.InspectFunc(constructor)
+	if !isFunc {
+		return nil, fmt.Errorf("constructor must be a function like func([dep1, dep2, ...]) (<result>, [cleanup, error]), got %s", reflect.TypeOf(constructor))
+	}
+	ctorType := determineCtorType(fn)
+	if ctorType == ctorUnknown {
+		return nil, fmt.Errorf("constructor must be a function like func([dep1, dep2, ...]) (<result>, [cleanup, error]), got %s", reflect.TypeOf(constructor))
+	}
+	return &providerConstructor{
+		name:     name,
+		ctor:     fn,
+		ctorType: determineCtorType(fn),
+	}, nil
+}
+
+// ID returns provider resultant type id.
+func (c providerConstructor) ID() id {
+	return id{
+		Name: c.name,
+		Type: c.ctor.Out(0),
 	}
 }
 
+// ParameterList returns constructor parameter list.
 func (c providerConstructor) ParameterList() parameterList {
 	var plist parameterList
 	for i := 0; i < c.ctor.NumIn(); i++ {
-		ptype := c.ctor.In(i)
-		var name string
-		if ptype == parameterBagType {
-			name = c.Key().String()
-		}
+		typ := c.ctor.In(i)
 		p := parameter{
-			name:     name,
-			res:      ptype,
+			// name:     "",
+			typ:      typ,
 			optional: false,
-			embed:    isEmbedParameter(ptype),
+			embed:    isEmbedParameter(typ),
 		}
 		plist = append(plist, p)
 	}
 	return plist
 }
 
-// Provide
+// Provide provides resultant.
 func (c *providerConstructor) Provide(values ...reflect.Value) (reflect.Value, func(), error) {
-	out := callResult(c.ctor.Call(values))
+	out := reflection.CallResult(c.ctor.Call(values))
 	switch c.ctorType {
 	case ctorStd:
-		return out.instance(), nil, nil
+		return out.Result(), nil, nil
 	case ctorError:
-		return out.instance(), nil, out.error(1)
+		return out.Result(), nil, out.Error(1)
 	case ctorCleanup:
-		return out.instance(), out.cleanup(), nil
+		return out.Result(), out.Cleanup(), nil
 	case ctorCleanupError:
-		return out.instance(), out.cleanup(), out.error(2)
+		return out.Result(), out.Cleanup(), out.Error(2)
 	}
 	return reflect.Value{}, nil, errors.New("you found a bug, please create new issue for " +
 		"this: https://github.com/goava/di/issues/new")
 }
 
 // determineCtorType
-func determineCtorType(fn *reflection.Func) ctorType {
+func determineCtorType(fn reflection.Func) ctorType {
 	if fn.NumOut() == 1 {
 		return ctorStd
 	}
@@ -103,26 +105,5 @@ func determineCtorType(fn *reflection.Func) ctorType {
 	if fn.NumOut() == 3 && reflection.IsCleanup(fn.Out(1)) && reflection.IsError(fn.Out(2)) {
 		return ctorCleanupError
 	}
-	panic(fmt.Sprintf("The constructor must be a function like `func([dep1, dep2, ...]) (<result>, [cleanup, error])`, got `%s`", fn.Name))
-}
-
-// callResult
-type callResult []reflect.Value
-
-func (r callResult) instance() reflect.Value {
-	return r[0]
-}
-
-func (r callResult) cleanup() func() {
-	if r[1].IsNil() {
-		return nil
-	}
-	return r[1].Interface().(func())
-}
-
-func (r callResult) error(position int) error {
-	if r[position].IsNil() {
-		return nil
-	}
-	return r[position].Interface().(error)
+	return ctorUnknown
 }

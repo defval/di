@@ -15,7 +15,7 @@ type Option interface {
 // alias and interface group. Note that a providing will occur on the Compile() call.
 func Provide(constructor Constructor, options ...ProvideOption) Option {
 	return containerOption(func(c *Container) {
-		c.provides = append(c.provides, constructorOptions{constructor, options})
+		c.ctors = append(c.ctors, constructorOptions{constructor, options})
 	})
 }
 
@@ -119,7 +119,7 @@ func Prototype() ProvideOption {
 // after dependency graph resolving.
 func Invoke(fn Invocation, options ...InvokeOption) Option {
 	return containerOption(func(c *Container) {
-		c.invocations = append(c.invocations, invocationOptions{fn, options})
+		c.invokes = append(c.invokes, invocationOptions{fn, options})
 	})
 }
 
@@ -157,12 +157,16 @@ func Options(options ...Option) Option {
 	})
 }
 
+// CompileOption is a functional option that change compile behaviour.
+type CompileOption interface {
+	apply(c *Container)
+}
+
 // ProvideParams is a `Provide()` method options. Name is a unique identifier of type instance. Provider is a constructor
 // function. Interfaces is a interface that implements a provider result type.
 type ProvideParams struct {
 	Name        string
 	Interfaces  []Interface
-	Parameters  ParameterBag
 	IsPrototype bool
 }
 
@@ -170,12 +174,12 @@ func (p ProvideParams) apply(params *ProvideParams) {
 	*params = p
 }
 
-// InvokeOption
+// InvokeOption is a functional option interface that modify invoke behaviour.
 type InvokeOption interface {
 	apply(params *InvokeParams)
 }
 
-// InvokeParams is a addInvocation parameters.
+// InvokeParams is a invoke parameters.
 type InvokeParams struct {
 	// The function
 	Fn interface{}
@@ -185,26 +189,31 @@ func (p InvokeParams) apply(params *InvokeParams) {
 	*params = p
 }
 
-// ExtractOption
-type ExtractOption interface {
-	apply(params *ExtractParams)
+// ResolveOption is a functional option interface that modify resolve behaviour.
+type ResolveOption interface {
+	apply(params *ResolveParams)
 }
 
-// Name specify definition name.
-func Name(name string) ExtractOption {
-	return extractOption(func(params *ExtractParams) {
+// Name specifies provider string identity. It needed when you have more than one
+// definition of same type. You can identity type by name.
+func Name(name string) ResolveOption {
+	return extractOption(func(params *ResolveParams) {
 		params.Name = name
 	})
 }
 
-// ExtractParams
-type ExtractParams struct {
+// ResolveParams is a resolve parameters.
+type ResolveParams struct {
 	Name string
 }
 
-func (p ExtractParams) apply(params *ExtractParams) {
+func (p ResolveParams) apply(params *ResolveParams) {
 	*params = p
 }
+
+type compileOption func(c *Container)
+
+func (o compileOption) apply(c *Container) { o(c) }
 
 type containerOption func(c *Container)
 
@@ -216,8 +225,8 @@ func (o provideOption) apply(params *ProvideParams) {
 	o(params)
 }
 
-type extractOption func(params *ExtractParams)
+type extractOption func(params *ResolveParams)
 
-func (o extractOption) apply(params *ExtractParams) {
+func (o extractOption) apply(params *ResolveParams) {
 	o(params)
 }

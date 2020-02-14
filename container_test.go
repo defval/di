@@ -3,6 +3,7 @@ package di_test
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"reflect"
@@ -15,86 +16,89 @@ import (
 )
 
 func TestContainerCompileErrors(t *testing.T) {
-	t.Run("dependency cycle cause panic", func(t *testing.T) {
+	t.Run("cycle cause error", func(t *testing.T) {
 		c := NewTestContainer(t)
-		c.MustProvide(ditest.NewCycleFooBar)
-		c.MustProvide(ditest.NewBar)
-		c.MustCompileError("the graph cannot be cyclic")
+		// bool -> int32 -> int64 -> bool
+		c.MustProvide(func(int32) bool { return true })
+		c.MustProvide(func(int64) int32 { return 0 })
+		c.MustProvide(func(bool) int64 { return 0 })
+		// additional provides for error check.
+		c.MustProvide(func(bool) uint64 { return 0 })
+		c.MustProvide(func(int64) uint { return 0 })
+		c.MustProvide(func(uint) uint8 { return 0 })
+		err := c.Compile()
+		require.NotNil(t, err)
+		// after container switch to use unordered map it can start building from any provider
+		f1 := err.Error() == "[bool int32 int64 bool] cycle detected"
+		f2 := err.Error() == "[int64 bool int32 int64] cycle detected"
+		f3 := err.Error() == "[int32 int64 bool int32] cycle detected"
+		require.True(t, f1 || f2 || f3)
 	})
 
 	t.Run("not existing dependency cause compile error", func(t *testing.T) {
 		c := NewTestContainer(t)
-		c.MustProvide(ditest.NewBar)
-		c.MustCompileError("*ditest.Bar: dependency *ditest.Foo not exists in container")
-	})
-
-	t.Run("not existing non pointer dependency cause compile error", func(t *testing.T) {
-		c := NewTestContainer(t)
-		type TestStruct struct {
-		}
-
-		c.MustProvide(func(s TestStruct) bool {
-			return true
-		})
-
-		require.PanicsWithValue(t, "bool: dependency di_test.TestStruct not exists in container", func() {
-			c.Compile()
-		})
+		c.MustProvide(func(int) int32 { return 0 })
+		c.MustCompileError("int32: dependency int not exists in container")
 	})
 }
 
 func TestContainerProvideErrors(t *testing.T) {
-	t.Run("provide string cause panic", func(t *testing.T) {
+	t.Run("provide string cause error", func(t *testing.T) {
 		c := NewTestContainer(t)
-		c.MustProvideError("string", "The constructor must be a function like `func([dep1, dep2, ...]) (<result>, [cleanup, error])`, got `string`")
+		require.EqualError(t, c.Provide("string"), "constructor must be a function like func([dep1, dep2, ...]) (<result>, [cleanup, error]), got string")
 	})
 
-	t.Run("provide nil cause panic", func(t *testing.T) {
+	t.Run("provide nil cause error", func(t *testing.T) {
 		c := NewTestContainer(t)
-		c.MustProvideError(nil, "The constructor must be a function like `func([dep1, dep2, ...]) (<result>, [cleanup, error])`, got `nil`")
+		c.MustProvideError(nil, "constructor must be a function like func([dep1, dep2, ...]) (<result>, [cleanup, error]), got nil")
 	})
 
-	t.Run("provide struct pointer cause panic", func(t *testing.T) {
+	t.Run("provide struct pointer cause error", func(t *testing.T) {
 		c := NewTestContainer(t)
-		c.MustProvideError(&ditest.Foo{}, "The constructor must be a function like `func([dep1, dep2, ...]) (<result>, [cleanup, error])`, got `*ditest.Foo`")
+		c.MustProvideError(&http.Server{}, "constructor must be a function like func([dep1, dep2, ...]) (<result>, [cleanup, error]), got *http.Server")
 	})
 
 	t.Run("provide constructor without result cause panic", func(t *testing.T) {
 		c := NewTestContainer(t)
-		c.MustProvideError(ditest.ConstructorWithoutResult, "The constructor must be a function like `func([dep1, dep2, ...]) (<result>, [cleanup, error])`, got `github.com/goava/di/internal/ditest.ConstructorWithoutResult`")
+		c.MustProvideError(func() {}, "constructor must be a function like func([dep1, dep2, ...]) (<result>, [cleanup, error]), got func()")
 	})
 
 	t.Run("provide constructor with many results cause panic", func(t *testing.T) {
 		c := NewTestContainer(t)
-		c.MustProvideError(ditest.ConstructorWithManyResults, "The constructor must be a function like `func([dep1, dep2, ...]) (<result>, [cleanup, error])`, got `github.com/goava/di/internal/ditest.ConstructorWithManyResults`")
+		c.MustProvideError(func() (*http.Server, *http.ServeMux, error) {
+			return nil, nil, nil
+		}, "constructor must be a function like func([dep1, dep2, ...]) (<result>, [cleanup, error]), got func() (*http.Server, *http.ServeMux, error)")
 	})
 
-	t.Run("provide constructor with incorrect result error argument", func(t *testing.T) {
+	t.Run("provide constructor with incorrect result error", func(t *testing.T) {
 		c := NewTestContainer(t)
-		c.MustProvideError(ditest.ConstructorWithIncorrectResultError, "The constructor must be a function like `func([dep1, dep2, ...]) (<result>, [cleanup, error])`, got `github.com/goava/di/internal/ditest.ConstructorWithIncorrectResultError`")
+		c.MustProvideError(func() (*http.Server, *http.ServeMux) {
+			return nil, nil
+		}, "constructor must be a function like func([dep1, dep2, ...]) (<result>, [cleanup, error]), got func() (*http.Server, *http.ServeMux)")
 	})
 
 	t.Run("provide duplicate", func(t *testing.T) {
 		c := NewTestContainer(t)
-		c.MustProvide(ditest.NewFoo)
-		c.MustProvideError(ditest.NewFoo, "The `*ditest.Foo` type already exists in container")
+		c.MustProvide(func() *http.Server { return nil })
+		c.MustProvideError(func() *http.Server { return nil }, "*http.Server already exists in dependency graph")
 	})
 
 	t.Run("provide as not implemented interface cause error", func(t *testing.T) {
 		c := NewTestContainer(t)
-		c.MustProvide(ditest.NewFoo)
-		c.MustProvideError(ditest.NewBar, "*ditest.Bar not implement ditest.Barer", new(ditest.Barer))
+		// http server not implement io.Reader interface
+		err := c.Provide(func() *http.Server { return nil }, di.As(new(io.Reader)))
+		require.EqualError(t, err, "*http.Server not implement io.Reader")
 	})
 
-	t.Run("provide as not interface cause error", func(t *testing.T) {
+	t.Run("using not interface type in As cause error", func(t *testing.T) {
 		c := NewTestContainer(t)
-		c.MustProvide(ditest.NewFoo)
-		c.MustProvideError(ditest.NewBar, "*ditest.Foo: not a pointer to interface", new(ditest.Foo))
+		err := c.Provide(func() *http.Server { return nil }, di.As(&http.Server{}))
+		require.EqualError(t, err, "*http.Server: not a pointer to interface")
 	})
 }
 
 func TestContainerExtractErrors(t *testing.T) {
-	t.Run("container panic on trying extract before compilation", func(t *testing.T) {
+	t.Run("container need to be compiled", func(t *testing.T) {
 		c := NewTestContainer(t)
 		foo := &ditest.Foo{}
 		c.MustProvide(ditest.CreateFooConstructor(foo))
@@ -155,21 +159,21 @@ func TestContainerExtractErrors(t *testing.T) {
 }
 
 func TestContainerInvokeErrors(t *testing.T) {
-	t.Run("addInvocation function with incorrect signature cause error", func(t *testing.T) {
+	t.Run("invocation function with incorrect signature cause error", func(t *testing.T) {
 		c := NewTestContainer(t)
 		c.MustCompile()
 		c.MustInvokeError(func() *ditest.Foo {
 			return nil
-		}, "the addInvocation function must be a function like `func([dep1, dep2, ...]) [error]`, got `func() *ditest.Foo`")
+		}, "the invocation function must be a function like `func([dep1, dep2, ...]) [error]`, got `func() *ditest.Foo`")
 	})
 
-	t.Run("addInvocation function with undefined dependency cause error", func(t *testing.T) {
+	t.Run("invocation function with undefined dependency cause error", func(t *testing.T) {
 		c := NewTestContainer(t)
 		c.MustCompile()
 		c.MustInvokeError(func(foo *ditest.Foo) {}, "resolve invocation (github.com/goava/di_test.TestContainerInvokeErrors.func2.1): *ditest.Foo: not exists in container")
 	})
 
-	t.Run("addInvocation before compile cause error", func(t *testing.T) {
+	t.Run("invocation before compile cause error", func(t *testing.T) {
 		c := NewTestContainer(t)
 		c.MustInvokeError(func() {}, "container not compiled")
 	})
@@ -401,7 +405,7 @@ func TestContainerResolveEmbedParameters(t *testing.T) {
 }
 
 func TestContainerInvoke(t *testing.T) {
-	t.Run("container call addInvocation function", func(t *testing.T) {
+	t.Run("container call invocation function", func(t *testing.T) {
 		c := NewTestContainer(t)
 		c.MustCompile()
 		var invokeCalled bool
@@ -411,7 +415,7 @@ func TestContainerInvoke(t *testing.T) {
 		require.True(t, invokeCalled)
 	})
 
-	t.Run("container resolve dependencies in addInvocation function", func(t *testing.T) {
+	t.Run("container resolve dependencies in invocation function", func(t *testing.T) {
 		c := NewTestContainer(t)
 		foo := ditest.NewFoo()
 		c.MustProvide(ditest.CreateFooConstructor(foo))
@@ -421,16 +425,16 @@ func TestContainerInvoke(t *testing.T) {
 		})
 	})
 
-	t.Run("container addInvocation return correct error", func(t *testing.T) {
+	t.Run("container invocation return correct error", func(t *testing.T) {
 		c := NewTestContainer(t)
 		c.MustProvide(ditest.NewFoo)
 		c.Compile()
 		c.MustInvokeError(func(foo *ditest.Foo) error {
-			return errors.New("addInvocation error")
-		}, "addInvocation error")
+			return errors.New("invocation error")
+		}, "invocation error")
 	})
 
-	t.Run("container addInvocation with nil error", func(t *testing.T) {
+	t.Run("container invocation with nil error", func(t *testing.T) {
 		c := NewTestContainer(t)
 		c.MustProvide(ditest.NewFoo)
 		c.Compile()
@@ -440,46 +444,47 @@ func TestContainerInvoke(t *testing.T) {
 	})
 }
 
-func TestContainerResolveParameterBag(t *testing.T) {
-	t.Run("container extract correct parameter bag for type", func(t *testing.T) {
-		c := NewTestContainer(t)
-
-		c.Provide(ditest.NewFooWithParameters, di.ProvideParams{
-			Parameters: di.ParameterBag{
-				"name": "test",
-			},
-		})
-
-		c.MustCompile()
-
-		var foo *ditest.Foo
-		err := c.Resolve(&foo)
-
-		require.NoError(t, err)
-		require.Equal(t, "test", foo.Name)
-	})
-
-	t.Run("container extract correct parameter bag for named type", func(t *testing.T) {
-		c := NewTestContainer(t)
-
-		c.Provide(ditest.NewFooWithParameters, di.ProvideParams{
-			Name: "named",
-			Parameters: di.ParameterBag{
-				"name": "test",
-			},
-		})
-
-		c.MustCompile()
-
-		var foo *ditest.Foo
-		err := c.Resolve(&foo, di.ExtractParams{
-			Name: "named",
-		})
-
-		require.NoError(t, err)
-		require.Equal(t, "test", foo.Name)
-	})
-}
+//
+// func TestContainerResolveParameterBag(t *testing.T) {
+// 	t.Run("container extract correct parameter bag for type", func(t *testing.T) {
+// 		c := NewTestContainer(t)
+//
+// 		c.Provide(ditest.NewFooWithParameters, di.ProvideParams{
+// 			Parameters: di.ParameterBag{
+// 				"name": "test",
+// 			},
+// 		})
+//
+// 		c.MustCompile()
+//
+// 		var foo *ditest.Foo
+// 		err := c.Resolve(&foo)
+//
+// 		require.NoError(t, err)
+// 		require.Equal(t, "test", foo.Name)
+// 	})
+//
+// 	t.Run("container extract correct parameter bag for named type", func(t *testing.T) {
+// 		c := NewTestContainer(t)
+//
+// 		c.Provide(ditest.NewFooWithParameters, di.ProvideParams{
+// 			Name: "named",
+// 			Parameters: di.ParameterBag{
+// 				"name": "test",
+// 			},
+// 		})
+//
+// 		c.MustCompile()
+//
+// 		var foo *ditest.Foo
+// 		err := c.Resolve(&foo, di.ResolveParams{
+// 			Name: "named",
+// 		})
+//
+// 		require.NoError(t, err)
+// 		require.Equal(t, "test", foo.Name)
+// 	})
+// }
 
 func TestContainerCleanup(t *testing.T) {
 	t.Run("cleanup container", func(t *testing.T) {
@@ -531,63 +536,64 @@ func TestContainerCleanup(t *testing.T) {
 	})
 }
 
-func TestContainer_GraphVisualizing(t *testing.T) {
-	t.Run("graph", func(t *testing.T) {
-		c := NewTestContainer(t)
-
-		c.MustProvide(ditest.NewLogger)
-		c.MustProvide(ditest.NewServer)
-		c.MustProvide(ditest.NewRouter, new(http.Handler))
-		c.MustProvide(ditest.NewAccountController, new(ditest.Controller))
-		c.MustProvide(ditest.NewAuthController, new(ditest.Controller))
-		c.MustCompile()
-
-		var graph *di.Graph
-		require.NoError(t, c.Resolve(&graph))
-
-		fmt.Println(graph.String())
-
-		require.Equal(t, `digraph  {
-	subgraph cluster_s3 {
-		ID = "cluster_s3";
-		bgcolor="#E8E8E8";color="lightgrey";fontcolor="#46494C";fontname="COURIER";label="";style="rounded";
-		n9[color="#46494C",fontcolor="white",fontname="COURIER",label="*di.Graph",shape="box",style="filled"];
-		
-	}subgraph cluster_s2 {
-		ID = "cluster_s2";
-		bgcolor="#E8E8E8";color="lightgrey";fontcolor="#46494C";fontname="COURIER";label="";style="rounded";
-		n6[color="#46494C",fontcolor="white",fontname="COURIER",label="*ditest.AccountController",shape="box",style="filled"];
-		n8[color="#46494C",fontcolor="white",fontname="COURIER",label="*ditest.AuthController",shape="box",style="filled"];
-		n7[color="#E54B4B",fontcolor="white",fontname="COURIER",label="[]ditest.Controller",shape="doubleoctagon",style="filled"];
-		n4[color="#E5984B",fontcolor="white",fontname="COURIER",label="ditest.RouterParams",shape="box",style="filled"];
-		
-	}subgraph cluster_s0 {
-		ID = "cluster_s0";
-		bgcolor="#E8E8E8";color="lightgrey";fontcolor="#46494C";fontname="COURIER";label="";style="rounded";
-		n1[color="#46494C",fontcolor="white",fontname="COURIER",label="*log.Logger",shape="box",style="filled"];
-		
-	}subgraph cluster_s1 {
-		ID = "cluster_s1";
-		bgcolor="#E8E8E8";color="lightgrey";fontcolor="#46494C";fontname="COURIER";label="";style="rounded";
-		n3[color="#46494C",fontcolor="white",fontname="COURIER",label="*http.ServeMux",shape="box",style="filled"];
-		n2[color="#46494C",fontcolor="white",fontname="COURIER",label="*http.Server",shape="box",style="filled"];
-		n5[color="#2589BD",fontcolor="white",fontname="COURIER",label="http.Handler",style="filled"];
-		
-	}splines="ortho";
-	n6->n7[color="#949494"];
-	n8->n7[color="#949494"];
-	n3->n5[color="#949494"];
-	n1->n2[color="#949494"];
-	n1->n3[color="#949494"];
-	n1->n6[color="#949494"];
-	n1->n8[color="#949494"];
-	n7->n4[color="#949494"];
-	n4->n3[color="#949494"];
-	n5->n2[color="#949494"];
-	
-}`, graph.String())
-	})
-}
+//
+// func TestContainer_GraphVisualizing(t *testing.T) {
+// 	t.Run("graph", func(t *testing.T) {
+// 		c := NewTestContainer(t)
+//
+// 		c.MustProvide(ditest.NewLogger)
+// 		c.MustProvide(ditest.NewServer)
+// 		c.MustProvide(ditest.NewRouter, new(http.Handler))
+// 		c.MustProvide(ditest.NewAccountController, new(ditest.Controller))
+// 		c.MustProvide(ditest.NewAuthController, new(ditest.Controller))
+// 		c.MustCompile()
+//
+// 		var graph *di.Graph
+// 		require.NoError(t, c.Resolve(&graph))
+//
+// 		fmt.Println(graph.String())
+//
+// 		require.Equal(t, `digraph  {
+// 	subgraph cluster_s3 {
+// 		ID = "cluster_s3";
+// 		bgcolor="#E8E8E8";color="lightgrey";fontcolor="#46494C";fontname="COURIER";label="";style="rounded";
+// 		n9[color="#46494C",fontcolor="white",fontname="COURIER",label="*di.Graph",shape="box",style="filled"];
+//
+// 	}subgraph cluster_s2 {
+// 		ID = "cluster_s2";
+// 		bgcolor="#E8E8E8";color="lightgrey";fontcolor="#46494C";fontname="COURIER";label="";style="rounded";
+// 		n6[color="#46494C",fontcolor="white",fontname="COURIER",label="*ditest.AccountController",shape="box",style="filled"];
+// 		n8[color="#46494C",fontcolor="white",fontname="COURIER",label="*ditest.AuthController",shape="box",style="filled"];
+// 		n7[color="#E54B4B",fontcolor="white",fontname="COURIER",label="[]ditest.Controller",shape="doubleoctagon",style="filled"];
+// 		n4[color="#E5984B",fontcolor="white",fontname="COURIER",label="ditest.RouterParams",shape="box",style="filled"];
+//
+// 	}subgraph cluster_s0 {
+// 		ID = "cluster_s0";
+// 		bgcolor="#E8E8E8";color="lightgrey";fontcolor="#46494C";fontname="COURIER";label="";style="rounded";
+// 		n1[color="#46494C",fontcolor="white",fontname="COURIER",label="*log.Logger",shape="box",style="filled"];
+//
+// 	}subgraph cluster_s1 {
+// 		ID = "cluster_s1";
+// 		bgcolor="#E8E8E8";color="lightgrey";fontcolor="#46494C";fontname="COURIER";label="";style="rounded";
+// 		n3[color="#46494C",fontcolor="white",fontname="COURIER",label="*http.ServeMux",shape="box",style="filled"];
+// 		n2[color="#46494C",fontcolor="white",fontname="COURIER",label="*http.Server",shape="box",style="filled"];
+// 		n5[color="#2589BD",fontcolor="white",fontname="COURIER",label="http.Handler",style="filled"];
+//
+// 	}splines="ortho";
+// 	n6->n7[color="#949494"];
+// 	n8->n7[color="#949494"];
+// 	n3->n5[color="#949494"];
+// 	n1->n2[color="#949494"];
+// 	n1->n3[color="#949494"];
+// 	n1->n6[color="#949494"];
+// 	n1->n8[color="#949494"];
+// 	n7->n4[color="#949494"];
+// 	n4->n3[color="#949494"];
+// 	n5->n2[color="#949494"];
+//
+// }`, graph.String())
+// 	})
+// }
 
 // NewTestContainer
 func NewTestContainer(t *testing.T) *TestContainer {
@@ -601,49 +607,39 @@ type TestContainer struct {
 }
 
 func (c *TestContainer) MustProvide(provider interface{}, as ...di.Interface) {
-	require.NotPanics(c.t, func() {
-		c.Provide(provider, di.ProvideParams{
-			Interfaces: as,
-		})
-	}, "provide should not panic")
+	err := c.Provide(provider, di.ProvideParams{Interfaces: as})
+	require.NoError(c.t, err)
 }
 
 func (c *TestContainer) MustProvidePrototype(provider interface{}, as ...di.Interface) {
-	require.NotPanics(c.t, func() {
-		c.Provide(provider, di.ProvideParams{
-			Interfaces:  as,
-			IsPrototype: true,
-		})
+	err := c.Provide(provider, di.ProvideParams{
+		Interfaces:  as,
+		IsPrototype: true,
 	})
+	require.NoError(c.t, err)
 }
 
 func (c *TestContainer) MustProvideWithName(name string, provider interface{}, as ...di.Interface) {
-	require.NotPanics(c.t, func() {
-		c.Provide(provider, di.ProvideParams{
-			Name:       name,
-			Interfaces: as,
-		})
+	err := c.Provide(provider, di.ProvideParams{
+		Name:       name,
+		Interfaces: as,
 	})
+	require.NoError(c.t, err)
 }
 
 func (c *TestContainer) MustProvideError(provider interface{}, msg string, as ...di.Interface) {
-	require.PanicsWithValue(c.t, msg, func() {
-		c.Provide(provider, di.ProvideParams{
-			Interfaces: as,
-		})
+	err := c.Provide(provider, di.ProvideParams{
+		Interfaces: as,
 	})
+	require.EqualError(c.t, err, msg)
 }
 
 func (c *TestContainer) MustCompile() {
-	require.NotPanics(c.t, func() {
-		c.Compile()
-	})
+	require.NoError(c.t, c.Compile())
 }
 
 func (c *TestContainer) MustCompileError(msg string) {
-	require.PanicsWithValue(c.t, msg, func() {
-		c.Compile()
-	})
+	require.EqualError(c.t, c.Compile(), msg)
 }
 
 func (c *TestContainer) MustExtract(target interface{}) {
@@ -651,19 +647,22 @@ func (c *TestContainer) MustExtract(target interface{}) {
 }
 
 func (c *TestContainer) MustExtractWithName(name string, target interface{}) {
-	require.NoError(c.t, c.Resolve(target, di.ExtractParams{
+	err := c.Resolve(target, di.ResolveParams{
 		Name: name,
-	}))
+	})
+	require.NoError(c.t, err)
 }
 
 func (c *TestContainer) MustExtractError(target interface{}, msg string) {
-	require.EqualError(c.t, c.Resolve(target, di.ExtractParams{}), msg)
+	err := c.Resolve(target, di.ResolveParams{})
+	require.EqualError(c.t, err, msg)
 }
 
 func (c *TestContainer) MustExtractWithNameError(name string, target interface{}, msg string) {
-	require.EqualError(c.t, c.Resolve(target, di.ExtractParams{
+	err := c.Resolve(target, di.ResolveParams{
 		Name: name,
-	}), msg)
+	})
+	require.EqualError(c.t, err, msg)
 }
 
 // MustExtractPtr extract value from container into target and check that target and expected pointers are equal.

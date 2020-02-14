@@ -1,42 +1,45 @@
 package di
 
 import (
+	"fmt"
 	"reflect"
 
 	"github.com/goava/di/internal/reflection"
 )
 
-// newProviderInterface
-func newProviderInterface(provider internalProvider, as interface{}) *providerInterface {
-	iface := reflection.InspectInterfacePtr(as)
-	if !provider.Key().res.Implements(iface.Type) {
-		panicf("%s not implement %s", provider.Key(), iface.Type)
-	}
-	return &providerInterface{
-		res: key{
-			name: provider.Key().name,
-			res:  iface.Type,
-			typ:  ptInterface,
-		},
-		provider: provider,
-	}
-}
-
 // providerInterface
 type providerInterface struct {
-	res      key
-	provider internalProvider
+	res      id
+	provider provider
 }
 
-func (i *providerInterface) Key() key {
+// newProviderInterface
+func newProviderInterface(provider provider, as interface{}) (*providerInterface, error) {
+	i, err := reflection.InspectInterfacePtr(as)
+	if err != nil {
+		return nil, err
+	}
+	if !provider.ID().Type.Implements(i.Type) {
+		return nil, fmt.Errorf("%s not implement %s", provider.ID(), i.Type)
+	}
+	return &providerInterface{
+		res: id{
+			Name: provider.ID().Name,
+			Type: i.Type,
+		},
+		provider: provider,
+	}, nil
+}
+
+func (i *providerInterface) ID() id {
 	return i.res
 }
 
 func (i *providerInterface) ParameterList() parameterList {
 	var plist parameterList
 	plist = append(plist, parameter{
-		name:     i.provider.Key().name,
-		res:      i.provider.Key().res,
+		name:     i.provider.ID().Name,
+		typ:      i.provider.ID().Type,
 		optional: false,
 		embed:    false,
 	})

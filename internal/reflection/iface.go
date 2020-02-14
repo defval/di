@@ -6,16 +6,16 @@ import (
 )
 
 // InspectInterfacePtr
-func InspectInterfacePtr(iface interface{}) *Interface {
+func InspectInterfacePtr(iface interface{}) (*Interface, error) {
 	typ := reflect.TypeOf(iface)
 	if typ.Kind() != reflect.Ptr || typ.Elem().Kind() != reflect.Interface {
-		panic(fmt.Sprintf("%s: not a pointer to interface", typ)) // todo: improve message
+		return nil, fmt.Errorf("%s: not a pointer to interface", typ)
 	}
 
 	return &Interface{
 		Name: typ.Elem().Name(),
 		Type: typ.Elem(),
-	}
+	}, nil
 }
 
 // Interface

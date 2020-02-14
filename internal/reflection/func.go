@@ -1,7 +1,6 @@
 package reflection
 
 import (
-	"fmt"
 	"reflect"
 	"runtime"
 )
@@ -18,18 +17,17 @@ type Func struct {
 	reflect.Value
 }
 
-// InspectFunction
-func InspectFunction(fn interface{}) *Func {
+// InspectFunc
+func InspectFunc(fn interface{}) (Func, bool) {
 	if !IsFunc(fn) {
-		panic(fmt.Sprintf("%s: not a function", reflect.TypeOf(fn).Kind())) // todo: improve message
+		return Func{}, false
 	}
-
 	val := reflect.ValueOf(fn)
-	fnpc := runtime.FuncForPC(val.Pointer())
-
-	return &Func{
-		Name:  fnpc.Name(),
-		Type:  val.Type(),
+	typ := val.Type()
+	funcForPC := runtime.FuncForPC(val.Pointer())
+	return Func{
+		Name:  funcForPC.Name(),
+		Type:  typ,
 		Value: val,
-	}
+	}, true
 }

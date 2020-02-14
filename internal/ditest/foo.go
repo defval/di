@@ -1,7 +1,5 @@
 package ditest
 
-import "github.com/goava/di"
-
 // Foo test struct
 type Foo struct {
 	Name string
@@ -10,11 +8,6 @@ type Foo struct {
 // NewFoo create new foo
 func NewFoo() *Foo {
 	return &Foo{}
-}
-
-// NewFooWithParameters
-func NewFooWithParameters(parameters di.ParameterBag) *Foo {
-	return &Foo{Name: parameters.RequireString("name")}
 }
 
 // NewCycleFooBar

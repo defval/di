@@ -7,44 +7,44 @@ import (
 	"github.com/goava/di/internal/reflection"
 )
 
-type invokerType int
+type invocationType int
 
 const (
-	invokerUnknown invokerType = iota
-	invokerStd                 // func (deps) {}
-	invokerError               // func (deps) error {}
+	invocationUnknown invocationType = iota
+	invokerStd                       // func (deps) {}
+	invokerError                     // func (deps) error {}
 )
 
-func determineInvokerType(fn *reflection.Func) (invokerType, error) {
+func determineInvokerType(fn reflection.Func) (invocationType, error) {
 	if fn.NumOut() == 0 {
 		return invokerStd, nil
 	}
 	if fn.NumOut() == 1 && reflection.IsError(fn.Out(0)) {
 		return invokerError, nil
 	}
-	return invokerUnknown, fmt.Errorf("the addInvocation function must be a function like `func([dep1, dep2, ...]) [error]`, got `%s`", fn.Type)
+	return invocationUnknown, fmt.Errorf("the invocation function must be a function like `func([dep1, dep2, ...]) [error]`, got `%s`", fn.Type)
 }
 
 type invoker struct {
-	typ invokerType
-	fn  *reflection.Func
+	typ invocationType
+	fn  reflection.Func
 }
 
 func newInvoker(fn interface{}) (*invoker, error) {
 	if fn == nil {
-		return nil, fmt.Errorf("the addInvocation function must be a function like `func([dep1, dep2, ...]) [error]`, got `%s`", "nil")
+		return nil, fmt.Errorf("the invocation function must be a function like `func([dep1, dep2, ...]) [error]`, got `%s`", "nil")
 	}
-	if !reflection.IsFunc(fn) {
-		return nil, fmt.Errorf("the addInvocation function must be a function like `func([dep1, dep2, ...]) [error]`, got `%s`", reflect.ValueOf(fn).Type())
+	inspected, isFn := reflection.InspectFunc(fn)
+	if !isFn {
+		return nil, fmt.Errorf("the invocation function must be a function like `func([dep1, dep2, ...]) [error]`, got `%s`", reflect.TypeOf(fn))
 	}
-	ifn := reflection.InspectFunction(fn)
-	typ, err := determineInvokerType(ifn)
+	typ, err := determineInvokerType(inspected)
 	if err != nil {
 		return nil, err
 	}
 	return &invoker{
 		typ: typ,
-		fn:  reflection.InspectFunction(fn),
+		fn:  inspected,
 	}, nil
 }
 
@@ -54,14 +54,11 @@ func (i *invoker) Invoke(c *Container) error {
 	if err != nil {
 		return fmt.Errorf("resolve invocation (%s): %s", i.fn.Name, err)
 	}
-	results := i.fn.Call(values)
+	results := reflection.CallResult(i.fn.Call(values))
 	if len(results) == 0 {
 		return nil
 	}
-	if results[0].Interface() == nil {
-		return nil
-	}
-	return results[0].Interface().(error)
+	return results.Error(0)
 }
 
 func (i *invoker) parameters() parameterList {
@@ -69,7 +66,7 @@ func (i *invoker) parameters() parameterList {
 	for j := 0; j < i.fn.NumIn(); j++ {
 		ptype := i.fn.In(j)
 		p := parameter{
-			res:      ptype,
+			typ:      ptype,
 			optional: false,
 			embed:    isEmbedParameter(ptype),
 		}

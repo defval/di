@@ -7,17 +7,17 @@ import (
 
 // providerStub
 type providerStub struct {
+	id  id
 	msg string
-	res key
 }
 
 // newProviderStub
-func newProviderStub(k key, msg string) *providerStub {
-	return &providerStub{res: k, msg: msg}
+func newProviderStub(id id, msg string) *providerStub {
+	return &providerStub{id: id, msg: msg}
 }
 
-func (m *providerStub) Key() key {
-	return m.res
+func (m *providerStub) ID() id {
+	return m.id
 }
 
 func (m *providerStub) ParameterList() parameterList {
