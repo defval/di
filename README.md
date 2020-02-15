@@ -99,7 +99,7 @@ yourself.
 // declare type variable
 var server *http.Server
 // extracting
-err := container.Extract(&server)
+err := container.Resolve(&server)
 if err != nil {
 	// check extraction error
 }
@@ -292,7 +292,7 @@ option.
 
 ```go
 var db *Database
-container.Extract(&db, di.Name("master"))
+container.Resolve(&db, di.Name("master"))
 ```
 
 If you need to provide named definition in other constructor use
