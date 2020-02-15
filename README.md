@@ -19,11 +19,11 @@ extensible.
 
 ## Contents
 
-- [Installing](https://github.com/goava/di/blob/master/README.md#installing)
+- [Install](https://github.com/goava/di/blob/master/README.md#installing)
 - [Tutorial](https://github.com/goava/di/blob/master/README.md#tutorial)
-  - [Providing](https://github.com/goava/di/blob/master/README.md#providing)
-  - [Extraction](https://github.com/goava/di/blob/master/README.md#extraction)
-  - [Invocation](https://github.com/goava/di/blob/master/README.md#invocation)
+  - [Provide](https://github.com/goava/di/blob/master/README.md#provide)
+  - [Resolve](https://github.com/goava/di/blob/master/README.md#resolve)
+  - [Invoke](https://github.com/goava/di/blob/master/README.md#invoke)
   - [Lazy-loading](https://github.com/goava/di/blob/master/README.md#lazy-loading)
   - [Interfaces](https://github.com/goava/di/blob/master/README.md#interfaces)
   - [Groups](https://github.com/goava/di/blob/master/README.md#groups)
@@ -33,17 +33,17 @@ extensible.
   - [Prototypes](https://github.com/goava/di/blob/master/README.md#prototypes)
   - [Cleanup](https://github.com/goava/di/blob/master/README.md#cleanup)
 
-## Installing
+## Install
 
 ```shell
 go get -u github.com/goava/di
 ```
 
-### Providing
+### Provide
 
 To start, we will need to create two fundamental types: `http.Server`
 and `http.ServeMux`. Let's create a simple constructors that initialize
-it:
+them:
 
 ```go
 // NewServer creates a http server with provided mux as handler.
@@ -68,22 +68,23 @@ func NewServeMux() *http.ServeMux {
 Now let's teach a container to build these types.
 
 ```go
-c := container.New()
+// build container
+c := container.New(
+	di.Provide(NewServer),
+	di.Provide(NewServeMux),
+)
 
-c.Provide(NewServer)
-c.Provide(NewServeMux)
-
-c.Compile()
+// compile dependency graph
+if err := c.Compile(); err != nil {
+	// handle error
+}
 ```
 
-The function `inject.New()` parse our constructors, compile dependency
-graph and return `*inject.Container` type for interaction. Container
-panics if it could not compile.
+The function `di.New()` creates new container with provided options.
+`Compile` compiles the container: parse constructors and build
+dependency graph.
 
-> I think that panic at the initialization of the application and not in
-> runtime is usual.
-
-### Extraction
+### Resolve
 
 We can extract the built server from the container. For this, define the
 variable of extracted type and pass variable pointer to `Extract`
@@ -110,9 +111,9 @@ server.ListenAndServe()
 > Note that by default, the container creates instances as a singleton.
 > But you can change this behaviour. See [Prototypes](https://github.com/goava/di/blob/master/README.md#prototypes).
 
-### Invocation
+### Invoke
 
-As an alternative to extraction we can use `Invoke()` function. It
+As an alternative to extraction we can use `Invoke()` function of `Container`. It
 resolves function dependencies and call the function. Invoke function
 may return optional error.
 
@@ -122,8 +123,26 @@ func StartServer(server *http.Server) error {
     return server.ListenAndServe()
 }
 
-container.Invoke(StartServer)
+if err := container.Invoke(StartServer); err != nil {
+	// handle error
+}
 ```
+
+Also you can use `di.Invoke()` container options for call some initialization code.
+
+```go
+container := di.New(
+	di.Provide(NewServer),
+    di.Invoke(StartServer),
+)
+
+if err := container.Compile(); err != nil {
+	// handle error
+}
+```
+
+Container run all invoke functions on compile stage. If one of them
+failed (return error), compile cause error.
 
 ### Lazy-loading
 
