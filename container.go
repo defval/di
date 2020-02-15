@@ -154,10 +154,10 @@ func (c *Container) Resolve(into interface{}, options ...ResolveOption) error {
 		return fmt.Errorf("container not compiled")
 	}
 	if into == nil {
-		return fmt.Errorf("resolve target must be a pointer, got `nil`")
+		return fmt.Errorf("resolve target must be a pointer, got nil")
 	}
 	if !reflection.IsPtr(into) {
-		return fmt.Errorf("resolve target must be a pointer, got `%s`", reflect.TypeOf(into))
+		return fmt.Errorf("resolve target must be a pointer, got %s", reflect.TypeOf(into))
 	}
 	params := ResolveParams{}
 	// apply extract options

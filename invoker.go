@@ -22,7 +22,7 @@ func determineInvokerType(fn reflection.Func) (invocationType, error) {
 	if fn.NumOut() == 1 && reflection.IsError(fn.Out(0)) {
 		return invokerError, nil
 	}
-	return invocationUnknown, fmt.Errorf("the invocation function must be a function like `func([dep1, dep2, ...]) [error]`, got `%s`", fn.Type)
+	return invocationUnknown, fmt.Errorf("invoke function must be a function like `func([dep1, dep2, ...]) [error]`, got %s", fn.Type)
 }
 
 type invoker struct {
@@ -32,11 +32,11 @@ type invoker struct {
 
 func newInvoker(fn interface{}) (*invoker, error) {
 	if fn == nil {
-		return nil, fmt.Errorf("the invocation function must be a function like `func([dep1, dep2, ...]) [error]`, got `%s`", "nil")
+		return nil, fmt.Errorf("invoke function must be a function like `func([dep1, dep2, ...]) [error]`, got %s", "nil")
 	}
 	inspected, isFn := reflection.InspectFunc(fn)
 	if !isFn {
-		return nil, fmt.Errorf("the invocation function must be a function like `func([dep1, dep2, ...]) [error]`, got `%s`", reflect.TypeOf(fn))
+		return nil, fmt.Errorf("invoke function must be a function like `func([dep1, dep2, ...]) [error]`, got %s", reflect.TypeOf(fn))
 	}
 	typ, err := determineInvokerType(inspected)
 	if err != nil {
