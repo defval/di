@@ -15,7 +15,7 @@ type Option interface {
 // alias and interface group. Note that a providing will occur on the Compile() call.
 func Provide(constructor Constructor, options ...ProvideOption) Option {
 	return containerOption(func(c *Container) {
-		c.ctors = append(c.ctors, constructorOptions{constructor, options})
+		c.ctors = append(c.ctors, provideOptions{constructor, options})
 	})
 }
 
@@ -115,11 +115,19 @@ func Prototype() ProvideOption {
 	})
 }
 
+// Resolve returns container options that resolves type into target. All resolves will be done on compile stage
+// after call invokes.
+func Resolve(target interface{}, options ...ResolveOption) Option {
+	return containerOption(func(c *Container) {
+		c.resolves = append(c.resolves, resolveOptions{target, options})
+	})
+}
+
 // Invoke returns container option that registers container invocation. All invocations will be called on compile stage
 // after dependency graph resolving.
 func Invoke(fn Invocation, options ...InvokeOption) Option {
 	return containerOption(func(c *Container) {
-		c.invokes = append(c.invokes, invocationOptions{fn, options})
+		c.invokes = append(c.invokes, invokeOptions{fn, options})
 	})
 }
 

@@ -37,11 +37,12 @@ func New(options ...Option) *Container {
 
 // Container is a dependency injection container.
 type Container struct {
-	compiled bool                 // compile state
-	graph    *graph.Graph         // graph storage
-	ctors    []constructorOptions // initial provides
-	invokes  []invocationOptions  // initial invocations
-	cleanups []func()             // cleanup functions
+	compiled bool             // compile state
+	graph    *graph.Graph     // graph storage
+	ctors    []provideOptions // initial provides
+	invokes  []invokeOptions  // initial invocations
+	resolves []resolveOptions // initial resolves
+	cleanups []func()         // cleanup functions
 
 }
 
@@ -141,9 +142,15 @@ func (c *Container) Compile(options ...CompileOption) error {
 		return err
 	}
 	c.compiled = true
-	// call initial invocations
+	// call initial invokes
 	for _, fn := range c.invokes {
 		if err := c.Invoke(fn.invocation, fn.options...); err != nil {
+			return err
+		}
+	}
+	// initial resolves
+	for _, res := range c.resolves {
+		if err := c.Resolve(res.target, res.options...); err != nil {
 			return err
 		}
 	}
@@ -231,13 +238,19 @@ func (c *Container) Cleanup() {
 }
 
 // struct that contains constructor with options.
-type constructorOptions struct {
+type provideOptions struct {
 	constructor Constructor
 	options     []ProvideOption
 }
 
-// struct that contains invocation with options.
-type invocationOptions struct {
+// struct that contains invoke function with options.
+type invokeOptions struct {
 	invocation Invocation
 	options    []InvokeOption
+}
+
+// struct that container resolve target with options.
+type resolveOptions struct {
+	target  interface{}
+	options []ResolveOption
 }

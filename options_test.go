@@ -11,6 +11,7 @@ import (
 
 func TestOptions(t *testing.T) {
 	var loadedServer *http.Server
+	var resolvedServer *http.Server
 	server := &http.Server{}
 	mux := &http.ServeMux{}
 	c := di.New(
@@ -25,9 +26,11 @@ func TestOptions(t *testing.T) {
 			di.Invoke(func(server *http.Server) {
 				loadedServer = server
 			}),
+			di.Resolve(&resolvedServer),
 		),
 	)
 	require.NoError(t, c.Compile())
 	require.Equal(t, loadedServer, server)
 	require.Equal(t, loadedServer.Handler, mux)
+	require.Equal(t, resolvedServer, server)
 }
