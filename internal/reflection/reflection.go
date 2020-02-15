@@ -4,17 +4,17 @@ import "reflect"
 
 var errorInterface = reflect.TypeOf(new(error)).Elem()
 
-// IsError
+// IsError checks that typ have error signature.
 func IsError(typ reflect.Type) bool {
 	return typ.Implements(errorInterface)
 }
 
-// IsCleanup
+// IsCleanup checks that typ have cleanup signature.
 func IsCleanup(typ reflect.Type) bool {
 	return typ.Kind() == reflect.Func && typ.NumIn() == 0 && typ.NumOut() == 0
 }
 
-// IsPtr
+// IsPtr checks that value is pointer.
 func IsPtr(value interface{}) bool {
 	return reflect.ValueOf(value).Kind() == reflect.Ptr
 }

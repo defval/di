@@ -5,7 +5,7 @@ import (
 	"reflect"
 )
 
-// InspectInterfacePtr
+// InspectInterfacePtr inspects interface pointer.
 func InspectInterfacePtr(iface interface{}) (*Interface, error) {
 	typ := reflect.TypeOf(iface)
 	if typ.Kind() != reflect.Ptr || typ.Elem().Kind() != reflect.Interface {
@@ -18,7 +18,7 @@ func InspectInterfacePtr(iface interface{}) (*Interface, error) {
 	}, nil
 }
 
-// Interface
+// Interface is a interface description.
 type Interface struct {
 	Name string
 	Type reflect.Type
