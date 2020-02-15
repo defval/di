@@ -133,7 +133,7 @@ Also you can use `di.Invoke()` container options for call some initialization co
 ```go
 container := di.New(
 	di.Provide(NewServer),
-    di.Invoke(StartServer),
+	di.Invoke(StartServer),
 )
 
 if err := container.Compile(); err != nil {
