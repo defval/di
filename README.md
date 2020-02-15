@@ -7,9 +7,8 @@ Container
 
 - [x] Functional option interface
 - [x] Regular interface
-- [ ] Convert panics to errors
-- [ ] Accept multiple types in container and correct resolving
-- [ ] Refactor tests
+- [x] Convert panics to errors
+- [x] Refactor tests
 - [ ] Documentation
 
 ##
@@ -31,10 +30,8 @@ extensible.
 - [Advanced features](https://github.com/goava/di/blob/master/README.md#advanced-features)
   - [Named definitions](https://github.com/goava/di/blob/master/README.md#named-definitions)
   - [Optional parameters](https://github.com/goava/di/blob/master/README.md#optional-parameters)
-  - [Parameter Bag](https://github.com/goava/di/blob/master/README.md#parameter-bag)
   - [Prototypes](https://github.com/goava/di/blob/master/README.md#prototypes)
   - [Cleanup](https://github.com/goava/di/blob/master/README.md#cleanup)
-  - [Visualization](https://github.com/goava/di/blob/master/README.md#visualization)
 
 ## Installing
 
@@ -147,7 +144,7 @@ func NewServer(handler http.Handler) *http.Server {
 ```
 
 For a container to know that as an implementation of `http.Handler` is
-necessary to use, we use the option `inject.As()`. The arguments of this
+necessary to use, we use the option `di.As()`. The arguments of this
 option must be a pointer(s) to an interface like `new(Endpoint)`.
 
 > This syntax may seem strange, but I have not found a better way to
@@ -156,11 +153,11 @@ option must be a pointer(s) to an interface like `new(Endpoint)`.
 Updated container initialization code:
 
 ```go
-container := inject.New(
+container := di.New(
 	// provide http server
-	inject.Provide(NewServer),
+	di.Provide(NewServer),
 	// provide http serve mux as http.Handler interface
-	inject.Provide(NewServeMux, inject.As(new(http.Handler)))
+	di.Provide(NewServeMux, di.As(new(http.Handler)))
 )
 ```
 
@@ -171,7 +168,7 @@ constructor. Using interfaces contributes to writing more testable code.
 
 Container automatically groups all implementations of interface to
 `[]<interface>` group. For example, provide with
-`inject.As(new(http.Handler)` automatically creates a group
+`di.As(new(http.Handler)` automatically creates a group
 `[]http.Handler`.
 
 Let's add some http controllers using this feature. Controllers have
@@ -231,16 +228,16 @@ func (e *UserController) RetrieveUsers(writer http.ResponseWriter, request *http
 }
 ```
 
-Just like in the example with interfaces, we will use `inject.As()`
+Just like in the example with interfaces, we will use `di.As()`
 provide option.
 
 ```go
-container := inject.New(
-	inject.Provide(NewServer),        // provide http server
-	inject.Provide(NewServeMux),       // provide http serve mux
+container := di.New(
+	di.Provide(NewServer),        // provide http server
+	di.Provide(NewServeMux),       // provide http serve mux
 	// endpoints
-	inject.Provide(NewOrderController, inject.As(new(Controller))),  // provide order controller
-	inject.Provide(NewUserController, inject.As(new(Controller))),  // provide user controller
+	di.Provide(NewOrderController, di.As(new(Controller))),  // provide order controller
+	di.Provide(NewUserController, di.As(new(Controller))),  // provide user controller
 )
 ```
 
@@ -280,22 +277,22 @@ type SlaveDatabase struct {
 }
 ```
 
-Second way is a using named definitions with `inject.WithName()` provide
+Second way is a using named definitions with `di.WithName()` provide
 option:
 
 ```go
 // provide master database
-inject.Provide(NewMasterDatabase, inject.WithName("master"))
+di.Provide(NewMasterDatabase, di.WithName("master"))
 // provide slave database
-inject.Provide(NewSlaveDatabase, inject.WithName("slave"))
+di.Provide(NewSlaveDatabase, di.WithName("slave"))
 ```
 
-If you need to extract it from container use `inject.Name()` extract
+If you need to extract it from container use `di.Name()` extract
 option.
 
 ```go
 var db *Database
-container.Extract(&db, inject.Name("master"))
+container.Extract(&db, di.Name("master"))
 ```
 
 If you need to provide named definition in other constructor use
@@ -349,34 +346,13 @@ type ServiceParameter struct {
 }
 ```
 
-### Parameter Bag
-
-If you need to specify some parameters on definition level you can use
-`inject.ParameterBag` provide option. This is a `map[string]interface{}`
-that transforms to `di.ParameterBag` type.
-
-```go
-// Provide server with parameter bag
-inject.Provide(NewServer, inject.ParameterBag{
-	"addr": ":8080",
-})
-
-// NewServer create a server with provided parameter bag. Note: use di.ParameterBag type.
-// Not inject.ParameterBag.
-func NewServer(pb di.ParameterBag) *http.Server {
-	return &http.Server{
-		Addr: pb.RequireString("addr"),
-	}
-}
-```
-
 ### Prototypes
 
 If you want to create a new instance on each extraction use
-`inject.Prototype()` provide option.
+`di.Prototype()` provide option.
 
 ```go
-inject.Provide(NewRequestContext, inject.Prototype())
+di.Provide(NewRequestContext, di.Prototype())
 ```
 
 > todo: real use case
@@ -405,33 +381,11 @@ After `container.Cleanup()` call, it iterate over instances and call
 cleanup function if it exists.
 
 ```go
-container := inject.New(
+container := di.New(
 	// ...
-    inject.Provide(NewFile),
+    di.Provide(NewFile),
 )
 
 // do something
 container.Cleanup() // file was closed
 ```
-
-> Cleanup now work incorrectly with prototype providers.
-
-## Visualization
-
-Dependency graph may be presented via
-([Graphviz](https://www.graphviz.org/)). For it, load string
-representation:
-
-```go
-var graph *di.Graph
-if err = container.Extract(&graph); err != nil {
-    // handle err
-}
-
-dotGraph := graph.String() // use string representation
-```
-
-And paste it to <a href="https://dreampuf.github.io/GraphvizOnline"
-target="_blank">graphviz online tool</a>:
-
-<img src="https://github.com/goava/di/raw/master/graph.png">

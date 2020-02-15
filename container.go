@@ -94,6 +94,7 @@ func (c *Container) Provide(constructor Constructor, options ...ProvideOption) (
 	// process group for interfaces
 	for _, iprov := range iprovs {
 		group := newProviderGroup(iprov.ID())
+		// if group node already exists use it
 		if !c.graph.AddNode(providerNode{group}) {
 			existing, err := c.graph.Node(group.ID())
 			if err != nil {
@@ -165,11 +166,14 @@ func (c *Container) Resolve(into interface{}, options ...ResolveOption) error {
 	for _, opt := range options {
 		opt.apply(&params)
 	}
-	typ := reflect.TypeOf(into)
+
+	typ := reflect.TypeOf(into).Elem()
+	if isEmbedParameter(typ) {
+		return fmt.Errorf("resolve target must be a pointer, got di.Parameter")
+	}
 	param := parameter{
-		name:  params.Name,
-		typ:   typ.Elem(),
-		embed: isEmbedParameter(typ),
+		name: params.Name,
+		typ:  typ,
 	}
 	value, err := param.ResolveValue(c)
 	if err != nil {
@@ -221,8 +225,8 @@ func (c *Container) Exists(target interface{}, options ...ResolveOption) bool {
 
 // Cleanup runs destructors in order that was been created.
 func (c *Container) Cleanup() {
-	for _, cleanup := range c.cleanups {
-		cleanup()
+	for i := len(c.cleanups) - 1; i >= 0; i-- {
+		c.cleanups[i]()
 	}
 }
 

@@ -454,6 +454,17 @@ func TestContainer_EmbedParameters(t *testing.T) {
 		c.MustResolve(&extracted)
 		require.True(t, extracted)
 	})
+
+	t.Run("resolving embed parameter cause error", func(t *testing.T) {
+		c := NewTestContainer(t)
+		require.NoError(t, c.Compile())
+		type Parameter struct {
+			di.Parameter
+			Server *http.Server `di:""`
+		}
+		var p Parameter
+		require.EqualError(t, c.Resolve(&p), "resolve target must be a pointer, got di.Parameter")
+	})
 }
 
 func TestContainer_Cleanup(t *testing.T) {
@@ -483,7 +494,7 @@ func TestContainer_Cleanup(t *testing.T) {
 		var server *http.Server
 		c.MustResolve(&server)
 		c.Cleanup()
-		require.Equal(t, []string{"mux", "server"}, cleanupCalls)
+		require.Equal(t, []string{"server", "mux"}, cleanupCalls)
 	})
 
 	t.Run("cleanup for every prototype instance", func(t *testing.T) {
