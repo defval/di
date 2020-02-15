@@ -107,11 +107,12 @@ func (c *Container) Provide(constructor Constructor, options ...ProvideOption) (
 }
 
 // Compile compiles the container. It iterates over all nodes
-// in graph and register their parameters.
+// in graph and register their parameters. Also container invoke functions provided
+// by di.Invoke() container option.
 func (c *Container) Compile(options ...CompileOption) error {
-	for _, opt := range options {
-		opt.apply(c)
-	}
+	// for _, opt := range options {
+	// 	opt.apply(c)
+	// }
 	// process constructors
 	for _, provide := range c.ctors {
 		if err := c.Provide(provide.constructor, provide.options...); err != nil {
@@ -138,13 +139,13 @@ func (c *Container) Compile(options ...CompileOption) error {
 	if err := graph.CheckCycles(c.graph); err != nil {
 		return err
 	}
+	c.compiled = true
 	// call initial invocations
 	for _, fn := range c.invokes {
 		if err := c.Invoke(fn.invocation, fn.options...); err != nil {
 			return err
 		}
 	}
-	c.compiled = true
 	return nil
 }
 
@@ -184,10 +185,10 @@ func (c *Container) Invoke(fn Invocation, options ...InvokeOption) error {
 	if !c.compiled {
 		return fmt.Errorf("container not compiled")
 	}
-	params := InvokeParams{}
-	for _, opt := range options {
-		opt.apply(&params)
-	}
+	// params := InvokeParams{}
+	// for _, opt := range options {
+	// 	opt.apply(&params)
+	// }
 	invoker, err := newInvoker(fn)
 	if err != nil {
 		return err
@@ -195,7 +196,7 @@ func (c *Container) Invoke(fn Invocation, options ...InvokeOption) error {
 	return invoker.Invoke(c)
 }
 
-// Exists todo: tests
+// Exists checks that type exists in container, if not it cause error.
 func (c *Container) Exists(target interface{}, options ...ResolveOption) bool {
 	if !c.compiled {
 		return false
