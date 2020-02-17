@@ -46,8 +46,9 @@ type Container struct {
 
 }
 
-// Provide adds constructor into container with parameters. It creates provider for constructor
-// and place it into graph.
+// Provide provides to container reliable way to build type. The constructor will be invoked lazily on-demand.
+// For more information about constructors see Constructor interface. ProvideOption can add additional behavior to
+// the process of type resolving.
 func (c *Container) Provide(constructor Constructor, options ...ProvideOption) (err error) {
 	params := ProvideParams{}
 	// apply provide options

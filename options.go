@@ -10,9 +10,9 @@ type Option interface {
 	apply(c *Container)
 }
 
-// Provide returns container option that provides type constructor to container with their options. Provide options
-// modify injection behaviour: di.WithName adds name to resolved type for identifying, di.As - creates interface
-// alias and interface group. Note that a providing will occur on the Compile() call.
+// Provide returns container option that provides to container reliable way to build type. The constructor will
+// be invoked lazily on-demand. For more information about constructors see Constructor interface. ProvideOption can
+// add additional behavior to the process of type resolving.
 func Provide(constructor Constructor, options ...ProvideOption) Option {
 	return containerOption(func(c *Container) {
 		c.ctors = append(c.ctors, provideOptions{constructor, options})
@@ -38,7 +38,8 @@ func Provide(constructor Constructor, options ...ProvideOption) Option {
 // Third result is a optional error. Sometimes our types cannot be constructed :(
 type Constructor interface{}
 
-// ProvideOption is a functional option interface that modify provide behaviour. See As(), WithName() and Prototype().
+// ProvideOption is a functional option interface that modify provide behaviour. See di.As(), di.WithName()
+// and di.Prototype().
 type ProvideOption interface {
 	apply(params *ProvideParams)
 }
