@@ -50,6 +50,11 @@ func (p parameter) ResolveValue(c *Container) (reflect.Value, error) {
 		return reflect.Value{}, ErrParameterProviderNotFound{param: p}
 	}
 	pl := provider.ParameterList()
+	if len(pl) > 0 {
+		_log("%s resolved with: %s", p, pl)
+	} else {
+		_log("%s resolved", p)
+	}
 	values, err := pl.Resolve(c)
 	if err != nil {
 		return reflect.Value{}, err
