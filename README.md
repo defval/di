@@ -1,15 +1,21 @@
 DI Container
-========
+============
 
 Dependency injection is one form of the broader technique of inversion
 of control. It is used to increase modularity of the program and make it
 extensible.
 
+Before using this repository, you should understand what does
+mean **go way**, but you want to reduce the boilerplate and add some
+brain to your code.
+
 ## Contents
 
+- [Documentation](https://github.com/goava/di/blob/master/README.md#documentation)
 - [Install](https://github.com/goava/di/blob/master/README.md#installing)
 - [Tutorial](https://github.com/goava/di/blob/master/README.md#tutorial)
   - [Provide](https://github.com/goava/di/blob/master/README.md#provide)
+  - [Compile](https://github.com/goava/di/blob/master/README.md#compile)
   - [Resolve](https://github.com/goava/di/blob/master/README.md#resolve)
   - [Invoke](https://github.com/goava/di/blob/master/README.md#invoke)
   - [Lazy-loading](https://github.com/goava/di/blob/master/README.md#lazy-loading)
@@ -20,6 +26,16 @@ extensible.
   - [Optional parameters](https://github.com/goava/di/blob/master/README.md#optional-parameters)
   - [Prototypes](https://github.com/goava/di/blob/master/README.md#prototypes)
   - [Cleanup](https://github.com/goava/di/blob/master/README.md#cleanup)
+
+
+## Documentation
+
+You can use standard go doc or if you does not have experience with
+auto-wiring libraries as [google/wire](https://github.com/google/wire),
+[uber-go/dig](https://github.com/uber-go/dig) or
+[uber-go/fx](https://github.com/uber-go/fx),
+[sarulabs/di](https://github.com/sarulabs/di) start with
+[tutorial](https://github.com/goava/di/blob/master/README.md#tutorial).
 
 ## Install
 
@@ -60,7 +76,7 @@ func NewServeMux() *http.ServeMux {
 > func([dep1, dep2, depN]) (result, [cleanup, error])
 > ```
 
-Now let's teach a container to build these types.
+Now let's teach a container to build these types:
 
 ```go
 // build container
@@ -68,16 +84,21 @@ c := container.New(
 	di.Provide(NewServer),
 	di.Provide(NewServeMux),
 )
+```
 
+The function `di.New()` creates new container with provided options.
+
+### Compile
+
+`Compile` compiles the container: parse constructors, build
+dependency graph, check that it is acyclic.
+
+```go
 // compile dependency graph
 if err := c.Compile(); err != nil {
 	// handle error
 }
 ```
-
-The function `di.New()` creates new container with provided options.
-`Compile` compiles the container: parse constructors and build
-dependency graph.
 
 ### Resolve
 
