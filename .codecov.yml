@@ -1,0 +1,15 @@
+coverage:
+  range: 70..98
+  round: down
+  precision: 2
+  status:
+    project:
+      default:
+        enabled: yes
+        target: 90
+        if_not_found: success
+        if_ci_failed: error
+    patch:
+      default:
+        enabled: yes
+        target: 70

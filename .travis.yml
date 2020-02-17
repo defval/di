@@ -1,0 +1,21 @@
+go_import_path: github.com/goava/di
+language: go
+sudo: false
+
+matrix:
+  include:
+    - go: "1.11.x"
+    - go: "1.12.x"
+    - go: "1.13.x"
+  fast_finish: true
+
+env:
+  global:
+    - GO111MODULE=on
+
+script:
+  - make test
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
+
