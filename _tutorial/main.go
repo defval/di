@@ -19,10 +19,10 @@ func main() {
 		di.Provide(NewContext),  // provide application context
 		di.Provide(NewServer),   // provide http server
 		di.Provide(NewServeMux), // provide http serve mux
-		// endpoints
+		// controllers
 		di.Provide(NewOrderController, di.As(new(Controller))), // provide order controller
 		di.Provide(NewUserController, di.As(new(Controller))),  // provide user controller
-		// invocations
+		// invokes
 		di.Invoke(StartServer),
 		// resolves
 		di.Resolve(&ctx),
