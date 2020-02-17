@@ -5,10 +5,6 @@ Dependency injection is one form of the broader technique of inversion
 of control. It is used to increase modularity of the program and make it
 extensible.
 
-Before using this repository, you should understand what does
-mean **go way**, but you want to reduce the boilerplate and add some
-brain to your code.
-
 ## Contents
 
 - [Documentation](https://github.com/goava/di/blob/master/README.md#documentation)
