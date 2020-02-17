@@ -1,17 +1,5 @@
-Container
-=================
-
-> It is a fork of [inject](https://github.com/defval/inject) container. Work in progress.
-
-## WIP
-
-- [x] Functional option interface
-- [x] Regular interface
-- [x] Convert panics to errors
-- [x] Refactor tests
-- [ ] Documentation
-
-##
+DI Container
+========
 
 Dependency injection is one form of the broader technique of inversion
 of control. It is used to increase modularity of the program and make it
@@ -38,6 +26,13 @@ extensible.
 ```shell
 go get -u github.com/goava/di
 ```
+
+## Tutorial
+
+Let's learn to use di by example. We will code a simple application
+that processes HTTP requests.
+
+The full tutorial code is available [here](./_tutorial/main.go)
 
 ### Provide
 
