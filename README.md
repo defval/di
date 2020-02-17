@@ -24,7 +24,7 @@ extensible.
 ## Install
 
 ```shell
-go get -u github.com/goava/di
+go get github.com/goava/di
 ```
 
 ## Tutorial
