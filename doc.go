@@ -21,6 +21,8 @@
 // SOFTWARE.
 
 /*
-Package di provides opinionated way to connect your application components.
+Package di provides opinionated way to connect your application components. Container
+allows you to inject dependencies into constructors or structures without the need to
+have specified each argument manually.
 */
 package di
