@@ -103,11 +103,11 @@ if err := c.Compile(); err != nil {
 ### Resolve
 
 We can extract the built server from the container. For this, define the
-variable of extracted type and pass variable pointer to `Extract`
+variable of extracted type and pass variable pointer to `Resolve`
 function.
 
 > If extracted type not found or the process of building instance cause
-> error, `Extract` return error.
+> error, `Resolve` return error.
 
 If no error occurred, we can use the variable as if we had built it
 yourself.
@@ -115,10 +115,10 @@ yourself.
 ```go
 // declare type variable
 var server *http.Server
-// extracting
+// resolving
 err := container.Resolve(&server)
 if err != nil {
-	// check extraction error
+	// handle error
 }
 
 server.ListenAndServe()
