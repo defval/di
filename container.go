@@ -10,18 +10,28 @@ import (
 
 // New creates new container with provided options. Example usage:
 //
-// 	func NewHTTPServer(handler http.Handler) *http.Server {
-// 		return &http.Server{}
+// 	func NewHTTPServer(mux *http.ServeMux) *http.Server {
+// 		return &http.Server{
+// 			Handler: mux,
+// 		}
 // 	}
-//
 // 	func NewHTTPServeMux() *http.ServeMux {
 // 		return http.ServeMux{}
 // 	}
 //
-// 	container := di.New(
+// Container initialization code:
+//
+// 	c := di.New(
 // 		di.Provide(NewHTTPServer),
-// 		di.Provide(NewHTTPServeMux, di.As()),
+// 		di.Provide(NewHTTPServeMux),
 // 	)
+// 	if err := c.Compile(); err != nil {
+//		// handle error
+//	}
+//	var server *http.Server
+//	if err := c.Resolve(&server); err != nil {
+//		// handle error
+//	}
 func New(options ...Option) *Container {
 	c := &Container{
 		compiled: false,
@@ -111,7 +121,7 @@ func (c *Container) Provide(constructor Constructor, options ...ProvideOption) (
 
 // Compile compiles the container. It iterates over all nodes
 // in graph and register their parameters. Also container invoke functions provided
-// by di.Invoke() container option.
+// by di.Invoke() container option and resolves types provided by di.Resolve() container option.
 func (c *Container) Compile(options ...CompileOption) error {
 	// for _, opt := range options {
 	// 	opt.apply(c)

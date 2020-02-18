@@ -185,7 +185,7 @@ type CompileOption interface {
 	apply(c *Container)
 }
 
-// ProvideParams is a `Provide()` method options. Name is a unique identifier of type instance. Provider is a constructor
+// ProvideParams is a Provide() method options. Name is a unique identifier of type instance. Provider is a constructor
 // function. Interfaces is a interface that implements a provider result type.
 type ProvideParams struct {
 	Name        string
