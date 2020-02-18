@@ -6,6 +6,7 @@ package di
 //
 // 	- di.Provide - provide constructors
 //	- di.Invoke - add invocations
+//	- di.Resolve - resolves type
 type Option interface {
 	apply(c *Container)
 }
@@ -65,12 +66,17 @@ type ProvideOption interface {
 //
 // Build container with di.As provide option:
 //
-//		container, err := di.New(
+//		c := di.New(
 //			di.Provide(NewServer),
 //			di.Provide(NewServeMux, di.As(new(http.Handler)),
 //		)
+//		if err := c.Compile(); err != nil {
+//			// handle error
+//		}
 //		var server *http.Server
-//		container.Resolve(&http.Server)
+//		if err := c.Resolve(&http.Server); err != nil {
+//			// handle error
+//		}
 //
 // In this example you can see how container inject type *http.ServeMux as http.Handler
 // interface into the server constructor.
@@ -81,7 +87,9 @@ type ProvideOption interface {
 // previous example.
 //
 //		var handlers []http.Handler
-//		container.Resolve(&handlers)
+//		if err := container.Resolve(&handlers); err != nil {
+//			// handle error
+//		}
 //
 // Container checks that provided type implements interface if not cause compile error.
 func As(interfaces ...Interface) ProvideOption {
@@ -104,11 +112,19 @@ func WithName(name string) ProvideOption {
 // Prototype modifies Provide() behavior. By default, each type resolves as a singleton. This option sets that
 // each type resolving creates a new instance of the type.
 //
-// 		Provide(&http.Server{}, inject.Prototype())
-//
-//   	var server1 *http.Server
-//   	var server2 *http.Server
-//   	container.Resolve(&server1, &server2)
+//		c := di.New(
+// 			Provide(NewHTTPServer, inject.Prototype())
+//		)
+//		if err := c.Compile(); err != nil {
+//			// handle error
+//		}
+// 		var server1, server2 *http.Server
+// 		if err := c.Resolve(&server1); err != nil {
+//			// handle error
+//		}
+//		if err := c.Resolve(&server2); err != nil {
+//			// handle error
+//		}
 //
 func Prototype() ProvideOption {
 	return provideOption(func(params *ProvideParams) {
@@ -148,13 +164,11 @@ type Invocation interface{}
 //     di.Provide(NewAccountController),
 //     di.Provide(NewAccountRepository),
 //   )
-//
 //   auth := di.Options(
 //     di.Provide(NewAuthController),
 //     di.Provide(NewAuthRepository),
 //   )
-//
-//   container, _ := New(
+//   container := di.New(
 //     account,
 //     auth,
 //   )

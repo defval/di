@@ -11,16 +11,16 @@ import (
 // New creates new container with provided options. Example usage:
 //
 // 	func NewHTTPServer(handler http.Handler) *http.Server {
-//   	return &http.Server{}
+// 		return &http.Server{}
 // 	}
 //
 // 	func NewHTTPServeMux() *http.ServeMux {
-//   	return http.ServeMux{}
+// 		return http.ServeMux{}
 // 	}
 //
 // 	container := di.New(
-//   	di.Provide(NewHTTPServer),
-//   	di.Provide(NewHTTPServeMux, di.As()),
+// 		di.Provide(NewHTTPServer),
+// 		di.Provide(NewHTTPServeMux, di.As()),
 // 	)
 func New(options ...Option) *Container {
 	c := &Container{
