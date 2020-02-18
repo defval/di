@@ -108,10 +108,9 @@ func (c *Container) Provide(constructor Constructor, options ...ProvideOption) (
 		group := newProviderGroup(iprov.ID())
 		// if group node already exists use it
 		if !c.graph.AddNode(providerNode{group}) {
-			existing, err := c.graph.Node(group.ID())
-			if err != nil {
-				return err
-			}
+			// if node add returns false graph node already exists
+			// error can be omitted
+			existing, _ := c.graph.Node(group.ID())
 			group = existing.(providerNode).provider.(*providerGroup)
 		}
 		group.Add(iprov.provider.ID())
