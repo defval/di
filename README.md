@@ -12,21 +12,21 @@ extensible.
 
 ## Contents
 
-- [Documentation](https://github.com/goava/di/blob/master/README.md#documentation)
-- [Install](https://github.com/goava/di/blob/master/README.md#installing)
-- [Tutorial](https://github.com/goava/di/blob/master/README.md#tutorial)
-  - [Provide](https://github.com/goava/di/blob/master/README.md#provide)
-  - [Compile](https://github.com/goava/di/blob/master/README.md#compile)
-  - [Resolve](https://github.com/goava/di/blob/master/README.md#resolve)
-  - [Invoke](https://github.com/goava/di/blob/master/README.md#invoke)
-  - [Lazy-loading](https://github.com/goava/di/blob/master/README.md#lazy-loading)
-  - [Interfaces](https://github.com/goava/di/blob/master/README.md#interfaces)
-  - [Groups](https://github.com/goava/di/blob/master/README.md#groups)
-- [Advanced features](https://github.com/goava/di/blob/master/README.md#advanced-features)
-  - [Named definitions](https://github.com/goava/di/blob/master/README.md#named-definitions)
-  - [Optional parameters](https://github.com/goava/di/blob/master/README.md#optional-parameters)
-  - [Prototypes](https://github.com/goava/di/blob/master/README.md#prototypes)
-  - [Cleanup](https://github.com/goava/di/blob/master/README.md#cleanup)
+- [Documentation](https://github.com/goava/di#documentation)
+- [Install](https://github.com/goava/di#installing)
+- [Tutorial](https://github.com/goava/di#tutorial)
+  - [Provide](https://github.com/goava/di#provide)
+  - [Compile](https://github.com/goava/di#compile)
+  - [Resolve](https://github.com/goava/di#resolve)
+  - [Invoke](https://github.com/goava/di#invoke)
+  - [Lazy-loading](https://github.com/goava/di#lazy-loading)
+  - [Interfaces](https://github.com/goava/di#interfaces)
+  - [Groups](https://github.com/goava/di#groups)
+- [Advanced features](https://github.com/goava/di#advanced-features)
+  - [Named definitions](https://github.com/goava/di#named-definitions)
+  - [Optional parameters](https://github.com/goava/di#optional-parameters)
+  - [Prototypes](https://github.com/goava/di#prototypes)
+  - [Cleanup](https://github.com/goava/di#cleanup)
 
 
 ## Documentation
@@ -35,7 +35,7 @@ You can use standard [pkg.go.dev](https://pkg.go.dev/github.com/goava/di) and in
 comments or if you does not have experience with auto-wiring libraries
 as [google/wire](https://github.com/google/wire),
 [uber-go/dig](https://github.com/uber-go/dig) or another start with
-[tutorial](https://github.com/goava/di/blob/master/README.md#tutorial).
+[tutorial](https://github.com/goava/di#tutorial).
 
 ## Install
 
@@ -125,7 +125,7 @@ server.ListenAndServe()
 ```
 
 > Note that by default, the container creates instances as a singleton.
-> But you can change this behaviour. See [Prototypes](https://github.com/goava/di/blob/master/README.md#prototypes).
+> But you can change this behaviour. See [Prototypes](https://github.com/goava/di#prototypes).
 
 ### Invoke
 
