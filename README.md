@@ -21,7 +21,6 @@ extensible.
   - [Lazy-loading](https://github.com/goava/di#lazy-loading)
   - [Interfaces](https://github.com/goava/di#interfaces)
   - [Groups](https://github.com/goava/di#groups)
-  - [Logging](https://github.com/goava/di#logging)
 - [Advanced features](https://github.com/goava/di#advanced-features)
   - [Modules](https://github.com/goava/di#modules)
   - [Named definitions](https://github.com/goava/di#named-definitions)
