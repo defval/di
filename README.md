@@ -16,18 +16,19 @@ extensible.
 - [Install](https://github.com/goava/di#installing)
 - [Tutorial](https://github.com/goava/di#tutorial)
   - [Provide](https://github.com/goava/di#provide)
-  - [Compile](https://github.com/goava/di#compile)
   - [Resolve](https://github.com/goava/di#resolve)
   - [Invoke](https://github.com/goava/di#invoke)
   - [Lazy-loading](https://github.com/goava/di#lazy-loading)
   - [Interfaces](https://github.com/goava/di#interfaces)
   - [Groups](https://github.com/goava/di#groups)
+  - [Logging](https://github.com/goava/di#logging)
 - [Advanced features](https://github.com/goava/di#advanced-features)
+  - [Modules](https://github.com/goava/di#modules)
   - [Named definitions](https://github.com/goava/di#named-definitions)
   - [Optional parameters](https://github.com/goava/di#optional-parameters)
   - [Prototypes](https://github.com/goava/di#prototypes)
   - [Cleanup](https://github.com/goava/di#cleanup)
-
+  - [Compile](https://github.com/goava/di#compile)
 
 ## Documentation
 
@@ -52,12 +53,11 @@ The full tutorial code is available [here](./_tutorial/main.go)
 
 ### Provide
 
-To start, we will need to create two fundamental types: `http.Server`
-and `http.ServeMux`. Let's create a simple constructors that initialize
-them:
+To start, we will need to provide way to build for two fundamental types: `http.Server`
+and `http.ServeMux`. Let's create a simple functional constructors that build them:
 
 ```go
-// NewServer creates a http server with provided mux as handler.
+// NewServer builds a http server with provided mux as handler.
 func NewServer(mux *http.ServeMux) *http.Server {
 	return &http.Server{
 		Handler: mux,
@@ -73,41 +73,33 @@ func NewServeMux() *http.ServeMux {
 > Supported constructor signature:
 >
 > ```go
+> // cleanup and error is a optional
 > func([dep1, dep2, depN]) (result, [cleanup, error])
 > ```
 
-Now let's teach a container to build these types:
+Now, we can teach the container to build these types in three style ways:
+
+In preferred functional option style:
 
 ```go
-// build container
-c := container.New(
+// create container
+container, err := container.New(
 	di.Provide(NewServer),
 	di.Provide(NewServeMux),
 )
-```
-
-The function `di.New()` creates new container with provided options.
-
-### Compile
-
-`Compile` compiles the container: parse constructors, build
-dependency graph, check that it is acyclic.
-
-```go
-// compile dependency graph
-if err := c.Compile(); err != nil {
-	// handle error
+if err != nil {
+    // handle error
 }
 ```
 
 ### Resolve
 
-We can extract the built server from the container. For this, define the
-variable of extracted type and pass variable pointer to `Resolve`
+Next, we can resolve the built server from the container. For this, define the
+variable of resolved type and pass variable pointer to `Resolve`
 function.
 
-> If extracted type not found or the process of building instance cause
-> error, `Resolve` return error.
+> If resolved type not found or the process of building instance cause
+> error.
 
 If no error occurred, we can use the variable as if we had built it
 yourself.
@@ -129,9 +121,8 @@ server.ListenAndServe()
 
 ### Invoke
 
-As an alternative to extraction we can use `Invoke()` function of `Container`. It
-resolves function dependencies and call the function. Invoke function
-may return optional error.
+As an alternative to resolving we can use `Invoke()` function of `Container`. It builds
+dependencies and call provided function. Invoke function may return optional error.
 
 ```go
 // StartServer starts the server.
@@ -147,13 +138,12 @@ if err := container.Invoke(StartServer); err != nil {
 Also you can use `di.Invoke()` container options for call some initialization code.
 
 ```go
-container := di.New(
+container, err := di.New(
 	di.Provide(NewServer),
 	di.Invoke(StartServer),
 )
-
-if err := container.Compile(); err != nil {
-	// handle error
+if err != nil {
+    // handle error
 }
 ```
 
@@ -188,12 +178,15 @@ option must be a pointer(s) to an interface like `new(Endpoint)`.
 Updated container initialization code:
 
 ```go
-container := di.New(
+container, err := di.New(
 	// provide http server
 	di.Provide(NewServer),
 	// provide http serve mux as http.Handler interface
 	di.Provide(NewServeMux, di.As(new(http.Handler)))
 )
+if err != nil {
+    // handle error
+}
 ```
 
 Now container uses provide `*http.ServeMux` as `http.Handler` in server
@@ -235,7 +228,7 @@ func (a *OrderController) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/orders", a.RetrieveOrders)
 }
 
-// Retrieve loads orders and writes it to the writer.
+// RetrieveOrders loads orders and writes it to the writer.
 func (a *OrderController) RetrieveOrders(writer http.ResponseWriter, request *http.Request) {
 	// implementation
 }
@@ -257,7 +250,7 @@ func (e *UserController) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/users", e.RetrieveUsers)
 }
 
-// Retrieve loads users and writes it using the writer.
+// RetrieveUsers loads users and writes it using the writer.
 func (e *UserController) RetrieveUsers(writer http.ResponseWriter, request *http.Request) {
     // implementation
 }
@@ -267,13 +260,16 @@ Just like in the example with interfaces, we will use `di.As()`
 provide option.
 
 ```go
-container := di.New(
+container, err := di.New(
 	di.Provide(NewServer),        // provide http server
 	di.Provide(NewServeMux),       // provide http serve mux
 	// endpoints
 	di.Provide(NewOrderController, di.As(new(Controller))),  // provide order controller
 	di.Provide(NewUserController, di.As(new(Controller))),  // provide user controller
 )
+if err != nil {
+    // handle error
+}
 ```
 
 Now, we can use `[]Controller` group in our mux. See updated code:
@@ -291,7 +287,34 @@ func NewServeMux(controllers []Controller) *http.ServeMux {
 }
 ```
 
+The full tutorial code is available [here](./_tutorial/main.go)
+
 ## Advanced features
+
+### Modules
+
+With container option `Options()` you can group your functionality:
+
+```go
+// account module
+account := di.Options(
+    di.Provide(NewAccountController), 
+    di.Provide(NewAccountRepository),
+)
+// auth module
+auth := di.Options(
+    di.Provide(NewAuthController), 
+    di.Provide(NewAuthRepository),
+)
+// build container
+container, err := di.New(
+    account, 
+    auth,
+)
+if err != nil {
+ // handle error
+}
+```
 
 ### Named definitions
 
@@ -416,11 +439,36 @@ After `container.Cleanup()` call, it iterate over instances and call
 cleanup function if it exists.
 
 ```go
-container := di.New(
+container, err := di.New(
 	// ...
     di.Provide(NewFile),
 )
-
+if err != nil {
+    // handle error
+}
 // do something
 container.Cleanup() // file was closed
 ```
+
+### Compile
+
+With `WithCompile()` container option you can eject compile stage from `New()`.
+
+```go
+container, err := di.New(
+    di.WithCompile(),	
+)
+if err != nil {
+	// handle error
+}
+if err = container.Compile(); err != nil {
+    // handle error
+}
+```
+
+`Compile` compiles the container: parses constructors, builds
+dependency graph, checks that it is acyclic, calls initial invokes and resolves.
+
+> In this case, you can see that container building consists of two stages: `New()` and `Compile()`.
+> This can be useful when you divide the code into several layers and will start control 
+> build flow of application.

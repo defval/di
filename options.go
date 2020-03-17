@@ -16,7 +16,7 @@ type Option interface {
 // add additional behavior to the process of type resolving.
 func Provide(constructor Constructor, options ...ProvideOption) Option {
 	return containerOption(func(c *Container) {
-		c.ctors = append(c.ctors, provideOptions{constructor, options})
+		c.provides = append(c.provides, provideOptions{constructor, options})
 	})
 }
 
@@ -66,15 +66,15 @@ type ProvideOption interface {
 //
 // Build container with di.As provide option:
 //
-//		c := di.New(
+//		container, err := di.New(
 //			di.Provide(NewServer),
 //			di.Provide(NewServeMux, di.As(new(http.Handler)),
 //		)
-//		if err := c.Compile(); err != nil {
+//		if err != nil {
 //			// handle error
 //		}
 //		var server *http.Server
-//		if err := c.Resolve(&http.Server); err != nil {
+//		if err := container.Resolve(&http.Server); err != nil {
 //			// handle error
 //		}
 //
@@ -112,17 +112,17 @@ func WithName(name string) ProvideOption {
 // Prototype modifies Provide() behavior. By default, each type resolves as a singleton. This option sets that
 // each type resolving creates a new instance of the type.
 //
-//		c := di.New(
+//		container, err := di.New(
 // 			Provide(NewHTTPServer, inject.Prototype())
 //		)
-//		if err := c.Compile(); err != nil {
+//		if err != nil {
 //			// handle error
 //		}
 // 		var server1, server2 *http.Server
-// 		if err := c.Resolve(&server1); err != nil {
+// 		if err := container.Resolve(&server1); err != nil {
 //			// handle error
 //		}
-//		if err := c.Resolve(&server2); err != nil {
+//		if err := container.Resolve(&server2); err != nil {
 //			// handle error
 //		}
 //
@@ -168,15 +168,32 @@ type Invocation interface{}
 //     di.Provide(NewAuthController),
 //     di.Provide(NewAuthRepository),
 //   )
-//   container := di.New(
+//   container, err := di.New(
 //     account,
 //     auth,
 //   )
+//   if err != nil {
+//     // handle error
+//   }
 func Options(options ...Option) Option {
 	return containerOption(func(container *Container) {
 		for _, opt := range options {
 			opt.apply(container)
 		}
+	})
+}
+
+// WithLogger sets container logger.
+func WithLogger(logger Logger) Option {
+	return containerOption(func(c *Container) {
+		c.logger = logger
+	})
+}
+
+// WithCompile puts the container compilation into a separate function.
+func WithCompile() Option {
+	return containerOption(func(c *Container) {
+		c.mcf = true
 	})
 }
 

@@ -21,39 +21,52 @@ import (
 //
 // Container initialization code:
 //
-// 	c := di.New(
+// 	container, err := di.New(
 // 		di.Provide(NewHTTPServer),
 // 		di.Provide(NewHTTPServeMux),
 // 	)
-// 	if err := c.Compile(); err != nil {
+// 	if err != nil {
 //		// handle error
 //	}
 //	var server *http.Server
 //	if err := c.Resolve(&server); err != nil {
 //		// handle error
 //	}
-func New(options ...Option) *Container {
+func New(options ...Option) (_ *Container, err error) {
 	c := &Container{
 		compiled: false,
 		graph:    graph.New(),
 		cleanups: make([]func(), 0, 8),
+		logger:   nopLogger{},
 	}
 	// apply container options
 	for _, opt := range options {
 		opt.apply(c)
 	}
-	return c
+	// process constructors
+	for _, provide := range c.provides {
+		if err := c.Provide(provide.constructor, provide.options...); err != nil {
+			return nil, err
+		}
+	}
+	if !c.mcf {
+		if err := c.Compile(); err != nil {
+			return nil, err
+		}
+	}
+	return c, nil
 }
 
 // Container is a dependency injection container.
 type Container struct {
+	mcf      bool             // manual compile flow - if true compile will not be called on New()
 	compiled bool             // compile state
 	graph    *graph.Graph     // graph storage
-	ctors    []provideOptions // initial provides
-	invokes  []invokeOptions  // initial invocations
+	provides []provideOptions // initial provides
+	invokes  []invokeOptions  // initial invokes
 	resolves []resolveOptions // initial resolves
 	cleanups []func()         // cleanup functions
-
+	logger   Logger           // internal logger
 }
 
 // Provide provides to container reliable way to build type. The constructor will be invoked lazily on-demand.
@@ -118,18 +131,14 @@ func (c *Container) Provide(constructor Constructor, options ...ProvideOption) (
 	return nil
 }
 
-// Compile compiles the container. It iterates over all nodes
-// in graph and register their parameters. Also container invoke functions provided
-// by di.Invoke() container option and resolves types provided by di.Resolve() container option.
-func (c *Container) Compile(options ...CompileOption) error {
-	// for _, opt := range options {
-	// 	opt.apply(c)
-	// }
-	// process constructors
-	for _, provide := range c.ctors {
-		if err := c.Provide(provide.constructor, provide.options...); err != nil {
-			return err
-		}
+// Compile compiles the container. First, it iterates over all definitions and register their
+// parameters. Container links definitions with each other and checks that result dependency graph is not cyclic.
+// In final, the container invoke functions provided by di.Invoke() container option and resolves types
+// provided by di.Resolve() container option. Between invokes and resolves, the container tries to find di.Logger
+// interface, and if it is found sets it as an internal logger.
+func (c *Container) Compile(_ ...CompileOption) error {
+	if c.compiled {
+		return fmt.Errorf("container already compiled")
 	}
 	// connect graph nodes, register provider parameters
 	for _, node := range c.graph.Nodes() {
@@ -152,6 +161,8 @@ func (c *Container) Compile(options ...CompileOption) error {
 		return err
 	}
 	c.compiled = true
+	// error omitted because if logger could not be resolve it will be default
+	_ = c.Resolve(&c.logger)
 	// call initial invokes
 	for _, fn := range c.invokes {
 		if err := c.Invoke(fn.invocation, fn.options...); err != nil {
@@ -217,11 +228,8 @@ func (c *Container) Invoke(fn Invocation, options ...InvokeOption) error {
 	return invoker.Invoke(c)
 }
 
-// Exists checks that type exists in container, if not it cause error.
-func (c *Container) Exists(target interface{}, options ...ResolveOption) bool {
-	if !c.compiled {
-		return false
-	}
+// Has checks that type exists in container, if not it return false.
+func (c *Container) Has(target interface{}, options ...ResolveOption) bool {
 	if target == nil {
 		return false
 	}
@@ -240,11 +248,16 @@ func (c *Container) Exists(target interface{}, options ...ResolveOption) bool {
 	return exists
 }
 
-// Cleanup runs destructors in order that was been created.
+// Cleanup runs destructors in reverse order that was been created.
 func (c *Container) Cleanup() {
 	for i := len(c.cleanups) - 1; i >= 0; i-- {
 		c.cleanups[i]()
 	}
+}
+
+// Parameter is embed helper that indicates that type is a constructor embed parameter.
+type Parameter struct {
+	internalParameter
 }
 
 // struct that contains constructor with options.

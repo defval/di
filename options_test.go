@@ -15,7 +15,7 @@ func TestOptions(t *testing.T) {
 		var resolvedServer *http.Server
 		server := &http.Server{}
 		mux := &http.ServeMux{}
-		c := di.New(
+		c, err := di.New(
 			di.Options(
 				di.Provide(func(handler http.Handler) *http.Server {
 					server.Handler = handler
@@ -30,16 +30,18 @@ func TestOptions(t *testing.T) {
 				di.Resolve(&resolvedServer),
 			),
 		)
-		require.NoError(t, c.Compile())
+		require.NoError(t, err)
+		require.NotNil(t, c)
 		require.Equal(t, loadedServer, server)
 		require.Equal(t, loadedServer.Handler, mux)
 		require.Equal(t, resolvedServer, server)
 	})
 
 	t.Run("provide failed on compile", func(t *testing.T) {
-		c := di.New(
+		c, err := di.New(
 			di.Provide(func() {}),
 		)
-		require.EqualError(t, c.Compile(), "constructor must be a function like func([dep1, dep2, ...]) (<result>, [cleanup, error]), got func()")
+		require.Nil(t, c)
+		require.EqualError(t, err, "constructor must be a function like func([dep1, dep2, ...]) (<result>, [cleanup, error]), got func()")
 	})
 }

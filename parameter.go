@@ -9,11 +9,6 @@ func isEmbedParameter(typ reflect.Type) bool {
 	return typ.Kind() == reflect.Struct && typ.Implements(parameterInterface)
 }
 
-// Parameter is embed helper that indicates that type is a constructor embed parameter.
-type Parameter struct {
-	internalParameter
-}
-
 // parameterRequired
 type parameter struct {
 	name     string       // string identifier
@@ -51,9 +46,9 @@ func (p parameter) ResolveValue(c *Container) (reflect.Value, error) {
 	}
 	pl := provider.ParameterList()
 	if len(pl) > 0 {
-		_log("%s resolved with: %s", p, pl)
+		c.logger.Logf("%s resolved with: %s", p, pl)
 	} else {
-		_log("%s resolved", p)
+		c.logger.Logf("%s resolved", p)
 	}
 	values, err := pl.Resolve(c)
 	if err != nil {

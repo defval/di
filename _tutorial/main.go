@@ -11,11 +11,23 @@ import (
 	"github.com/goava/di"
 )
 
-func main() {
-	di.SetLogFunc(log.Printf)
+// StdLogger is a standard logger with implementation via log.
+type StdLogger struct {
+}
 
+// NewStdLogger creates std logger.
+func NewStdLogger() *StdLogger {
+	return &StdLogger{}
+}
+
+func (l *StdLogger) Logf(format string, values ...interface{}) {
+	log.Printf(format, values...)
+}
+
+func main() {
 	var ctx context.Context
-	container := di.New(
+	c, err := di.New(
+		di.Provide(NewStdLogger, di.As(new(di.Logger))),
 		di.Provide(NewContext),  // provide application context
 		di.Provide(NewServer),   // provide http server
 		di.Provide(NewServeMux), // provide http serve mux
@@ -27,11 +39,11 @@ func main() {
 		// resolves
 		di.Resolve(&ctx),
 	)
-	if err := container.Compile(); err != nil {
+	if err != nil {
 		log.Fatal(err)
 	}
 	<-ctx.Done()
-	container.Cleanup()
+	c.Cleanup()
 }
 
 // StartServer starts http server.

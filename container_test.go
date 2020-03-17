@@ -63,7 +63,7 @@ func TestContainer_Resolve(t *testing.T) {
 		require.EqualError(t, err, "resolve target must be a pointer, got string")
 	})
 
-	t.Run("resolve with not compiled container cause error ", func(t *testing.T) {
+	t.Run("resolve with not compiled container cause error", func(t *testing.T) {
 		c := NewTestContainer(t)
 		var extracted *http.Server
 		err := c.Resolve(&extracted)
@@ -324,29 +324,29 @@ func TestContainer_Provide(t *testing.T) {
 	})
 }
 
-func TestContainer_Exists(t *testing.T) {
+func TestContainer_Has(t *testing.T) {
 	t.Run("exists on not compiled container return false", func(t *testing.T) {
 		c := NewTestContainer(t)
-		require.False(t, c.Exists(nil))
+		require.False(t, c.Has(nil))
 	})
 	t.Run("exists nil returns false", func(t *testing.T) {
 		c := NewTestContainer(t)
 		c.MustCompile()
-		require.False(t, c.Exists(nil))
+		require.False(t, c.Has(nil))
 	})
 	t.Run("exists return true if type exists", func(t *testing.T) {
 		c := NewTestContainer(t)
 		c.MustProvide(func() *http.Server { return &http.Server{} })
 		c.MustCompile()
 		var server *http.Server
-		require.True(t, c.Exists(&server))
+		require.True(t, c.Has(&server))
 	})
 
 	t.Run("exists return false if type not exists", func(t *testing.T) {
 		c := NewTestContainer(t)
 		c.MustCompile()
 		var server *http.Server
-		require.False(t, c.Exists(&server))
+		require.False(t, c.Has(&server))
 	})
 
 	t.Run("exists interface", func(t *testing.T) {
@@ -354,7 +354,7 @@ func TestContainer_Exists(t *testing.T) {
 		c.MustProvide(func() *http.Server { return &http.Server{} }, new(io.Closer))
 		c.MustCompile()
 		var server io.Closer
-		require.True(t, c.Exists(&server))
+		require.True(t, c.Has(&server))
 	})
 
 	t.Run("exists named provider", func(t *testing.T) {
@@ -363,7 +363,21 @@ func TestContainer_Exists(t *testing.T) {
 		require.NoError(t, err)
 		c.MustCompile()
 		var server *http.Server
-		require.True(t, c.Exists(&server, di.Name("server")))
+		require.True(t, c.Has(&server, di.Name("server")))
+	})
+
+	t.Run("has works on not compiled container", func(t *testing.T) {
+		type hasServer func(server *http.Server) error
+		c, err := di.New(
+			di.Provide(func() *http.Server {
+				return &http.Server{}
+			}),
+			di.WithCompile(),
+		)
+		require.NoError(t, err)
+		var server *http.Server
+		require.True(t, c.Has(&server))
+		require.NoError(t, c.Compile())
 	})
 }
 
@@ -519,7 +533,11 @@ func TestContainer_Cleanup(t *testing.T) {
 
 // NewTestContainer
 func NewTestContainer(t *testing.T) *TestContainer {
-	return &TestContainer{t, di.New()}
+	c, err := di.New(
+		di.WithCompile(),
+	)
+	require.NoError(t, err)
+	return &TestContainer{t, c}
 }
 
 // TestContainer
