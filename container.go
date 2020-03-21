@@ -73,6 +73,9 @@ type Container struct {
 // For more information about constructors see Constructor interface. ProvideOption can add additional behavior to
 // the process of type resolving.
 func (c *Container) Provide(constructor Constructor, options ...ProvideOption) (err error) {
+	if c.compiled {
+		return fmt.Errorf("dependency providing restricted after container compile")
+	}
 	params := ProvideParams{}
 	// apply provide options
 	for _, opt := range options {
@@ -138,7 +141,7 @@ func (c *Container) Provide(constructor Constructor, options ...ProvideOption) (
 // interface, and if it is found sets it as an internal logger.
 func (c *Container) Compile(_ ...CompileOption) error {
 	if c.compiled {
-		return fmt.Errorf("container already compiled")
+		return fmt.Errorf("container already compiled, recompilation restricted")
 	}
 	// connect graph nodes, register provider parameters
 	for _, node := range c.graph.Nodes() {
@@ -181,7 +184,7 @@ func (c *Container) Compile(_ ...CompileOption) error {
 // Resolve builds instance of target type and fills target pointer.
 func (c *Container) Resolve(into interface{}, options ...ResolveOption) error {
 	if !c.compiled {
-		return fmt.Errorf("container not compiled")
+		return fmt.Errorf("container not compiled, resolve dependencies possible only after compilation")
 	}
 	if into == nil {
 		return fmt.Errorf("resolve target must be a pointer, got nil")
@@ -215,7 +218,7 @@ func (c *Container) Resolve(into interface{}, options ...ResolveOption) error {
 // Invoke calls provided function.
 func (c *Container) Invoke(fn Invocation, options ...InvokeOption) error {
 	if !c.compiled {
-		return fmt.Errorf("container not compiled")
+		return fmt.Errorf("container not compiled, function invokes possible only after compilation")
 	}
 	// params := InvokeParams{}
 	// for _, opt := range options {
