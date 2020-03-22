@@ -67,7 +67,7 @@ func TestContainer_Resolve(t *testing.T) {
 		c := NewTestContainer(t)
 		var extracted *http.Server
 		err := c.Resolve(&extracted)
-		require.EqualError(t, err, "container not compiled")
+		require.EqualError(t, err, "container not compiled, resolve dependencies possible only after compilation")
 	})
 
 	t.Run("resolve returns error because dependency constructing failed", func(t *testing.T) {
@@ -193,7 +193,7 @@ func TestContainer_Group(t *testing.T) {
 	t.Run("invocation before compile cause error", func(t *testing.T) {
 		c := NewTestContainer(t)
 		err := c.Invoke(func() {})
-		require.EqualError(t, err, "container not compiled")
+		require.EqualError(t, err, "container not compiled, function invokes possible only after compilation")
 	})
 
 	t.Run("incorrect signature", func(t *testing.T) {
@@ -317,10 +317,16 @@ func TestContainer_Provide(t *testing.T) {
 		require.EqualError(t, err, "*http.Server not implement io.Reader")
 	})
 
-	t.Run("using not interface type in As cause error", func(t *testing.T) {
+	t.Run("using not interface type in di.As() cause error", func(t *testing.T) {
 		c := NewTestContainer(t)
 		err := c.Provide(func() *http.Server { return nil }, di.As(&http.Server{}))
 		require.EqualError(t, err, "*http.Server: not a pointer to interface")
+	})
+
+	t.Run("using nil type in di.As() cause error", func(t *testing.T) {
+		c := NewTestContainer(t)
+		err := c.Provide(func() *http.Server { return &http.Server{} }, di.As(nil))
+		require.EqualError(t, err, "nil: not a pointer to interface")
 	})
 }
 

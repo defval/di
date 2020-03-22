@@ -6,6 +6,7 @@ import (
 
 	"github.com/goava/di/internal/graph"
 	"github.com/goava/di/internal/reflection"
+	"github.com/goava/di/internal/stacktrace"
 )
 
 // New creates new container with provided options. Example usage:
@@ -44,10 +45,14 @@ func New(options ...Option) (_ *Container, err error) {
 		opt.apply(c)
 	}
 	// process constructors
+	provideErr := errProvideFailed{}
 	for _, provide := range c.provides {
 		if err := c.Provide(provide.constructor, provide.options...); err != nil {
-			return nil, err
+			provideErr = provideErr.Append(provide.frame, err)
 		}
+	}
+	if len(provideErr) > 0 {
+		return nil, provideErr
 	}
 	if !c.mcf {
 		if err := c.Compile(); err != nil {
@@ -167,15 +172,15 @@ func (c *Container) Compile(_ ...CompileOption) error {
 	// error omitted because if logger could not be resolve it will be default
 	_ = c.Resolve(&c.logger)
 	// call initial invokes
-	for _, fn := range c.invokes {
-		if err := c.Invoke(fn.invocation, fn.options...); err != nil {
-			return err
+	for _, invoke := range c.invokes {
+		if err := c.Invoke(invoke.fn, invoke.options...); err != nil {
+			return errInvokeFailed{invoke.frame, err}
 		}
 	}
 	// initial resolves
-	for _, res := range c.resolves {
-		if err := c.Resolve(res.target, res.options...); err != nil {
-			return err
+	for _, resolve := range c.resolves {
+		if err := c.Resolve(resolve.target, resolve.options...); err != nil {
+			return errResolveFailed{resolve.frame, err}
 		}
 	}
 	return nil
@@ -265,18 +270,21 @@ type Parameter struct {
 
 // struct that contains constructor with options.
 type provideOptions struct {
+	frame       stacktrace.Frame
 	constructor Constructor
 	options     []ProvideOption
 }
 
 // struct that contains invoke function with options.
 type invokeOptions struct {
-	invocation Invocation
-	options    []InvokeOption
+	frame   stacktrace.Frame
+	fn      Invocation
+	options []InvokeOption
 }
 
 // struct that container resolve target with options.
 type resolveOptions struct {
+	frame   stacktrace.Frame
 	target  interface{}
 	options []ResolveOption
 }

@@ -42,6 +42,18 @@ func TestOptions(t *testing.T) {
 			di.Provide(func() {}),
 		)
 		require.Nil(t, c)
-		require.EqualError(t, err, "constructor must be a function like func([dep1, dep2, ...]) (<result>, [cleanup, error]), got func()")
+		require.NotNil(t, err)
+		require.Contains(t, err.Error(), "di.Provide(..) failed:")
+		require.Contains(t, err.Error(), "options_test.go:42: constructor must be a function like func([dep1, dep2, ...]) (<result>, [cleanup, error]), got func()")
+	})
+
+	t.Run("invoke failed on compile", func(t *testing.T) {
+		c, err := di.New(
+			di.Invoke(func(string2 string) {}),
+		)
+		require.Nil(t, c)
+		require.NotNil(t, err)
+		require.Contains(t, err.Error(), "di.Invoke(..) failed:")
+		require.Contains(t, err.Error(), "options_test.go:52: resolve invocation (github.com/goava/di_test.TestOptions.func3.1): string: not exists in container")
 	})
 }
