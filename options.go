@@ -1,5 +1,7 @@
 package di
 
+import "github.com/goava/di/internal/stacktrace"
+
 // Option is a functional option that configures container. If you don't know about functional
 // options, see https://dave.cheney.net/2014/10/17/functional-options-for-friendly-apis.
 // Below presented all possible options with their description:
@@ -15,8 +17,13 @@ type Option interface {
 // be invoked lazily on-demand. For more information about constructors see Constructor interface. ProvideOption can
 // add additional behavior to the process of type resolving.
 func Provide(constructor Constructor, options ...ProvideOption) Option {
+	frame := stacktrace.CallerFrame(0)
 	return containerOption(func(c *Container) {
-		c.provides = append(c.provides, provideOptions{constructor, options})
+		c.provides = append(c.provides, provideOptions{
+			frame,
+			constructor,
+			options,
+		})
 	})
 }
 
@@ -135,16 +142,26 @@ func Prototype() ProvideOption {
 // Resolve returns container options that resolves type into target. All resolves will be done on compile stage
 // after call invokes.
 func Resolve(target interface{}, options ...ResolveOption) Option {
+	frame := stacktrace.CallerFrame(0)
 	return containerOption(func(c *Container) {
-		c.resolves = append(c.resolves, resolveOptions{target, options})
+		c.resolves = append(c.resolves, resolveOptions{
+			frame,
+			target,
+			options,
+		})
 	})
 }
 
 // Invoke returns container option that registers container invocation. All invocations will be called on compile stage
 // after dependency graph resolving.
 func Invoke(fn Invocation, options ...InvokeOption) Option {
+	frame := stacktrace.CallerFrame(0)
 	return containerOption(func(c *Container) {
-		c.invokes = append(c.invokes, invokeOptions{fn, options})
+		c.invokes = append(c.invokes, invokeOptions{
+			frame,
+			fn,
+			options,
+		})
 	})
 }
 

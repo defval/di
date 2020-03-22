@@ -7,6 +7,9 @@ import (
 
 // InspectInterfacePtr inspects interface pointer.
 func InspectInterfacePtr(iface interface{}) (*Interface, error) {
+	if iface == nil {
+		return nil, fmt.Errorf("nil: not a pointer to interface")
+	}
 	typ := reflect.TypeOf(iface)
 	if typ.Kind() != reflect.Ptr || typ.Elem().Kind() != reflect.Interface {
 		return nil, fmt.Errorf("%s: not a pointer to interface", typ)
