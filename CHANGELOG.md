@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!--## [Unrealeased]-->
 
+## v1.0.2
+
+### Added
+
+- Location of `di.Provide()`, `di.Invoke()`, `di.Resolve()` in error.
+
+### Fixed
+
+- Fix: `di.As()` with nil causes panic
+
 ## v1.0.1
 
 ### Fixed
