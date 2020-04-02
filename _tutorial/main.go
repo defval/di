@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -34,26 +35,33 @@ func main() {
 		// controllers
 		di.Provide(NewOrderController, di.As(new(Controller))), // provide order controller
 		di.Provide(NewUserController, di.As(new(Controller))),  // provide user controller
-		// invokes
-		di.Invoke(StartServer),
 		// resolves
 		di.Resolve(&ctx),
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
-	<-ctx.Done()
-	c.Cleanup()
+	if err := c.Invoke(StartServer); err != nil {
+		log.Fatal(err)
+	}
 }
 
 // StartServer starts http server.
-func StartServer(server *http.Server) {
+func StartServer(ctx context.Context, server *http.Server) error {
+	log.Println("start server")
+	errChan := make(chan error)
 	go func() {
-		log.Println("start listen")
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Println("listen error:", err)
+			errChan <- err
 		}
 	}()
+	select {
+	case <-ctx.Done():
+		log.Println("stop server")
+		return server.Close()
+	case err := <-errChan:
+		return fmt.Errorf("server error: %s", err)
+	}
 }
 
 // NewContext creates new application context.
@@ -69,18 +77,12 @@ func NewContext() context.Context {
 }
 
 // NewServer creates a http server with provided mux as handler.
-func NewServer(mux *http.ServeMux) (*http.Server, func()) {
+func NewServer(mux *http.ServeMux) *http.Server {
 	server := &http.Server{
 		Addr:    ":8080",
 		Handler: mux,
 	}
-	cleanup := func() {
-		if err := server.Close(); err != nil {
-			log.Println("server close error:", err)
-		}
-		log.Println("server closed")
-	}
-	return server, cleanup
+	return server
 }
 
 // NewServeMux creates a new http serve mux.
@@ -111,7 +113,7 @@ func (a *OrderController) RegisterRoutes(mux *http.ServeMux) {
 }
 
 // Retrieve loads orders and writes it to the writer.
-func (a *OrderController) RetrieveOrders(writer http.ResponseWriter, request *http.Request) {
+func (a *OrderController) RetrieveOrders(writer http.ResponseWriter, _ *http.Request) {
 	writer.WriteHeader(http.StatusOK)
 	_, _ = writer.Write([]byte("Orders"))
 }
@@ -130,7 +132,7 @@ func (e *UserController) RegisterRoutes(mux *http.ServeMux) {
 }
 
 // Retrieve loads users and writes it using the writer.
-func (e *UserController) RetrieveUsers(writer http.ResponseWriter, request *http.Request) {
+func (e *UserController) RetrieveUsers(writer http.ResponseWriter, _ *http.Request) {
 	writer.WriteHeader(http.StatusOK)
 	_, _ = writer.Write([]byte("Users"))
 }
