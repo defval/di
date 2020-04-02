@@ -26,7 +26,6 @@ func (l *StdLogger) Logf(format string, values ...interface{}) {
 }
 
 func main() {
-	var ctx context.Context
 	c, err := di.New(
 		di.Provide(NewStdLogger, di.As(new(di.Logger))),
 		di.Provide(NewContext),  // provide application context
@@ -35,8 +34,6 @@ func main() {
 		// controllers
 		di.Provide(NewOrderController, di.As(new(Controller))), // provide order controller
 		di.Provide(NewUserController, di.As(new(Controller))),  // provide user controller
-		// resolves
-		di.Resolve(&ctx),
 	)
 	if err != nil {
 		log.Fatal(err)
