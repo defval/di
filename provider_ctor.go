@@ -130,7 +130,7 @@ func (c *providerConstructor) Provide(values ...reflect.Value) (result reflect.V
 			"this: https://github.com/goava/di/issues/new")
 	}
 	// handel returns
-	if len(returns) > 0 {
+	if len(returns) > 0 && err == nil  && !result.IsNil() {
 		temp := reflect.Indirect(result)
 		for i, p := range c.returnList() {
 			v := returns[i]
