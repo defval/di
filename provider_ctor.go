@@ -69,24 +69,78 @@ func (c providerConstructor) ParameterList() parameterList {
 		}
 		plist = append(plist, p)
 	}
+	plist = append(plist, c.returnList()...)
+	return plist
+}
+
+func (c providerConstructor) returnList() parameterList {
+	var plist parameterList
+	typ := c.ctor.Out(0)
+	if typ.Kind() == reflect.Ptr {
+		typ = typ.Elem()
+	}
+	if typ.Kind() != reflect.Struct {
+		return plist
+	}
+	for i := 0; i < typ.NumField(); i++ {
+		fieldType := typ.Field(i)
+		tag, ok := fieldType.Tag.Lookup("di")
+		if ok {
+			name, optional := parseTag(tag)
+			p := parameter{
+				name:     name,
+				typ:      fieldType.Type,
+				optional: optional,
+				returns: i,
+			}
+			plist = append(plist, p)
+		}
+	}
 	return plist
 }
 
 // Provide provides resultant.
-func (c *providerConstructor) Provide(values ...reflect.Value) (reflect.Value, func(), error) {
+func (c *providerConstructor) Provide(values ...reflect.Value) (result reflect.Value, cleanup func(), err error) {
+	var (
+		numIn = c.ctor.NumIn()
+		valuesLen = len(values)
+		hasReturn = numIn < valuesLen
+		returns []reflect.Value
+	)
+	if hasReturn {
+		returns = values[valuesLen-1:]
+		values = values[:valuesLen-1]
+	}
 	out := reflection.CallResult(c.ctor.Call(values))
 	switch c.ctorType {
 	case ctorStd:
-		return out.Result(), nil, nil
+		result = out.Result()
 	case ctorError:
-		return out.Result(), nil, out.Error(1)
+		result = out.Result()
+		err = out.Error(1)
 	case ctorCleanup:
-		return out.Result(), out.Cleanup(), nil
+		result = out.Result()
+		cleanup = out.Cleanup()
 	case ctorCleanupError:
-		return out.Result(), out.Cleanup(), out.Error(2)
+		result = out.Result()
+		cleanup = out.Cleanup()
+		err = out.Error(2)
+	default:
+		return reflect.Value{}, nil, errors.New("you found a bug, please create new issue for " +
+			"this: https://github.com/goava/di/issues/new")
 	}
-	return reflect.Value{}, nil, errors.New("you found a bug, please create new issue for " +
-		"this: https://github.com/goava/di/issues/new")
+	// handel returns
+	if len(returns) > 0 {
+		temp := reflect.Indirect(result)
+		for i, p := range c.returnList() {
+			v := returns[i]
+			field := temp.Field(p.returns)
+			if field.CanSet() {
+				field.Set(v)
+			}
+		}
+	}
+	return
 }
 
 // determineCtorType

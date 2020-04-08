@@ -2,8 +2,6 @@ package di
 
 import (
 	"reflect"
-	"strings"
-	"unsafe"
 )
 
 // isEmbedParameter
@@ -17,6 +15,7 @@ type parameter struct {
 	typ      reflect.Type // resultant type
 	optional bool         // optional flag
 	embed    bool         // embed flag
+	returns  int          // return struct field index
 }
 
 // String represents parameter as string.
@@ -63,61 +62,7 @@ func (p parameter) ResolveValue(c *Container) (reflect.Value, error) {
 	if cleanup != nil {
 		c.cleanups = append(c.cleanups, cleanup)
 	}
-	// inject struct
-	err = p.ResolveProperty(c, value)
-	if err != nil {
-		return reflect.Value{}, err
-	}
 	return value, nil
-}
-
-const (
-	flagRO = 0b1100000
-)
-
-func ValuePatch(v reflect.Value) reflect.Value {
-	rv := reflect.ValueOf(&v)
-	flag := rv.Elem().FieldByName("flag")
-	ptrFlag := (*uintptr)(unsafe.Pointer(flag.UnsafeAddr()))
-	*ptrFlag = *ptrFlag &^ flagRO
-	return v
-}
-
-func (p parameter) ResolveProperty(c *Container, value reflect.Value) (err error) {
-	value = reflect.Indirect(value)
-	if value.Kind() != reflect.Struct {
-		return nil
-	}
-	vType := value.Type()
-	for i := 0; i < value.NumField(); i++ {
-		fieldType := vType.Field(i)
-		field := ValuePatch(value.Field(i))
-		tag, ok := fieldType.Tag.Lookup("di")
-		if ok {
-			var optional = false
-			var name string
-			tags := strings.Split(tag, ",")
-			for _, t := range tags {
-				t = strings.Trim(t, " ")
-				if t == "optional" {
-					optional = true
-					continue
-				}
-				name = t
-			}
-			pp := parameter{
-				name:     name,
-				typ:      fieldType.Type,
-				optional: optional,
-			}
-			param, err := pp.ResolveValue(c)
-			if err != nil {
-				return err
-			}
-			field.Set(param)
-		}
-	}
-	return nil
 }
 
 // internalParameter
