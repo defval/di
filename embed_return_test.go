@@ -47,7 +47,9 @@ func TestEmbedReturn(t *testing.T) {
 			Provide(NewServer2),
 		)
 		require.NotNil(t, err)
-		require.True(t, err.Error() == "[*di.Config2 *di.Server2 *di.Config2] cycle detected", err.Error())
+		f1 := err.Error() == "[*di.Config2 *di.Server2 *di.Config2] cycle detected"
+		f2 := err.Error() == "[*di.Server2 *di.Config2 *di.Server2] cycle detected"
+		require.True(t, f1 || f2, err.Error())
 	})
 
 }
