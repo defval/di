@@ -68,7 +68,6 @@ func (i *invoker) parameters() parameterList {
 		p := parameter{
 			typ:      ptype,
 			optional: false,
-			embed:    isEmbedParameter(ptype),
 		}
 		plist = append(plist, p)
 	}
