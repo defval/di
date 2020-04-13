@@ -2,14 +2,7 @@ package di
 
 import (
 	"reflect"
-	"strings"
 )
-
-// Parameter is embed helper that indicates that type is a constructor embed parameter.
-// Deprecated: Use di.Injectable
-type Parameter struct {
-	injectable
-}
 
 // Injectable indicates that public fields with special tag type will be injected automatically.
 //
@@ -82,31 +75,72 @@ func inspectInjectableStructFieldType(field reflect.StructField) (injectableStru
 		return injectableStructFieldTag{}, false
 	}
 	optional, _ := field.Tag.Lookup("optional")
-	options := strings.Split(di, ",")
-	if len(options) == 0 {
-		return injectableStructFieldTag{
-			optional: optional == "true",
-		}, true
-	}
-	if len(options) == 1 && options[0] == "optional" {
-		return injectableStructFieldTag{
-			optional: true,
-		}, true
-	}
-	if len(options) == 1 {
-		return injectableStructFieldTag{
-			name:     options[0],
-			optional: optional == "true",
-		}, true
-	}
-	if len(options) == 2 && options[1] == "optional" {
-		return injectableStructFieldTag{
-			name:     options[0],
-			optional: true,
-		}, true
-	}
 	return injectableStructFieldTag{
 		name:     di,
 		optional: optional == "true", // `optional:"true"`
 	}, true
+}
+
+// createStructProvider creates embed provider.
+func providerFromInjectableParameter(p parameter) *providerEmbed {
+	var typ reflect.Type
+	if p.typ.Kind() == reflect.Ptr {
+		typ = p.typ.Elem()
+	} else {
+		typ = p.typ
+	}
+	provider := &providerEmbed{
+		id: id{
+			Name: p.name,
+			Type: p.typ,
+		},
+		typ: typ,
+		val: reflect.New(typ).Elem(),
+	}
+	provider.injectable.params, provider.injectable.fields = parseInjectableType(p.typ)
+	return provider
+}
+
+type providerEmbed struct {
+	id         id
+	typ        reflect.Type
+	val        reflect.Value
+	injectable struct {
+		// params parsed once
+		params []parameter
+		// field numbers parsed once
+		fields []int
+	}
+}
+
+func (p *providerEmbed) ID() id {
+	return p.id
+}
+
+func (p *providerEmbed) ParameterList() parameterList {
+	return p.injectable.params
+}
+
+func (p *providerEmbed) Provide(values ...reflect.Value) (reflect.Value, func(), error) {
+	// set injectable fields
+	if len(p.injectable.fields) > 0 {
+		// result value
+		rv := p.val
+		if rv.Kind() == reflect.Ptr {
+			rv = rv.Elem()
+		}
+		if !rv.CanSet() {
+			panic("you found a bug, please create new issue for this: https://github.com/goava/di/issues/new")
+		}
+		// field index
+		for i, value := range values {
+			// field value
+			fv := rv.Field(p.injectable.fields[i])
+			if !fv.CanSet() {
+				continue
+			}
+			fv.Set(value)
+		}
+	}
+	return p.val, nil, nil
 }

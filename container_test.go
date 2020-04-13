@@ -39,6 +39,13 @@ func TestContainer_Compile(t *testing.T) {
 		c.MustProvide(func(int) int32 { return 0 })
 		require.EqualError(t, c.Compile(), "int32: dependency int not exists in container")
 	})
+
+	t.Run("recompilation cause error", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		require.EqualError(t, c.Compile(), "container already compiled, recompilation restricted")
+	})
 }
 
 func TestContainer_Resolve(t *testing.T) {
@@ -101,6 +108,16 @@ func TestContainer_Resolve(t *testing.T) {
 		c.MustResolvePtr(server, &extracted2)
 	})
 
+	t.Run("incorrect resolve cause error on compile", func(t *testing.T) {
+		c, err := di.New(
+			di.Resolve(&http.Server{}),
+		)
+		require.Nil(t, c)
+		require.NotNil(t, err)
+		require.Contains(t, err.Error(), "di.Resolve(..) failed:")
+		require.Contains(t, err.Error(), "goava/di/container_test.go")
+		require.Contains(t, err.Error(), ": http.Server: not exists in container")
+	})
 }
 
 func TestContainer_Resolve_Name(t *testing.T) {
@@ -328,6 +345,12 @@ func TestContainer_Provide(t *testing.T) {
 		err := c.Provide(func() *http.Server { return &http.Server{} }, di.As(nil))
 		require.EqualError(t, err, "nil: not a pointer to interface")
 	})
+
+	t.Run("provide after compilation cause error", func(t *testing.T) {
+		c := NewTestContainer(t)
+		c.MustCompile()
+		require.EqualError(t, c.Provide(func() {}), "dependency providing restricted after container compile")
+	})
 }
 
 func TestContainer_Has(t *testing.T) {
@@ -546,91 +569,6 @@ func TestContainer_Injectable(t *testing.T) {
 		require.NoError(t, c.Compile())
 		type Parameter struct {
 			di.Injectable
-			Server *http.Server `di:""`
-		}
-		var p Parameter
-		require.EqualError(t, c.Resolve(&p), "di_test.Parameter: not exists in container")
-	})
-}
-
-func TestContainer_Parameters(t *testing.T) {
-	t.Run("container resolve embed parameters", func(t *testing.T) {
-		c := NewTestContainer(t)
-		type Parameters struct {
-			di.Parameter
-			Server *http.Server `di:""`
-			File   *os.File     `di:""`
-		}
-		server := &http.Server{}
-		file := &os.File{}
-		c.MustProvide(func() *http.Server { return server })
-		c.MustProvide(func() *os.File { return file })
-		type Result struct {
-			server *http.Server
-			file   *os.File
-		}
-		c.MustProvide(func(params Parameters) *Result { return &Result{params.Server, params.File} })
-		c.MustCompile()
-		var extracted *Result
-		c.MustResolve(&extracted)
-		c.MustEqualPointer(server, extracted.server)
-		c.MustEqualPointer(file, extracted.file)
-	})
-
-	t.Run("optional parameter may be nil", func(t *testing.T) {
-		c := NewTestContainer(t)
-		type Parameter struct {
-			di.Parameter
-			Server *http.Server `di:"optional"`
-		}
-		type Result struct {
-			server *http.Server
-		}
-		c.MustProvide(func(params Parameter) *Result { return &Result{server: params.Server} })
-		c.MustCompile()
-
-		var extracted *Result
-		c.MustResolve(&extracted)
-		require.Nil(t, extracted.server)
-	})
-
-	t.Run("optional group may be nil", func(t *testing.T) {
-		c := NewTestContainer(t)
-		type Params struct {
-			di.Parameter
-			Handlers []http.Handler `di:"optional"`
-		}
-		c.MustProvide(func(params Params) bool {
-			return params.Handlers == nil
-		})
-		c.MustCompile()
-		var extracted bool
-		c.MustResolve(&extracted)
-		require.True(t, extracted)
-	})
-
-	t.Run("skip private fields", func(t *testing.T) {
-		c := NewTestContainer(t)
-		type Param struct {
-			di.Parameter
-			private    []http.Handler `di:"optional"`
-			Addrs      []net.Addr     `di:"optional"`
-			HaveNotTag string
-		}
-		c.MustProvide(func(param Param) bool {
-			return param.Addrs == nil
-		})
-		c.MustCompile()
-		var extracted bool
-		c.MustResolve(&extracted)
-		require.True(t, extracted)
-	})
-
-	t.Run("resolving embed parameter cause error", func(t *testing.T) {
-		c := NewTestContainer(t)
-		require.NoError(t, c.Compile())
-		type Parameter struct {
-			di.Parameter
 			Server *http.Server `di:""`
 		}
 		var p Parameter

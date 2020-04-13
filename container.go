@@ -146,7 +146,7 @@ func (c *Container) Compile(_ ...CompileOption) error {
 	for _, node := range c.graph.Nodes() {
 		provider := node.(providerNode)
 		for _, param := range provider.ParameterList() {
-			// node parameter provider
+			// parameter provider
 			pp, exists := param.ResolveProvider(c)
 			if exists {
 				if err := c.graph.AddEdge(pp.ID(), provider.ID(), 1); err != nil {
