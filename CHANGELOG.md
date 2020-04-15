@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!--## [Unrealeased]-->
 
+## v1.1.0
+
+### BREAKING CHANGES
+
+- Changed `di.Parameter` to `di.Inject`.
+- Remove `optional` support from `di` tag.
+- Add `optional` tag. See [this](https://github.com/goava/di#optional-parameters).
+
+### Added
+
+- Support injection into constructor result struct via `di.Inject`.
+
 ## v1.0.2
 
 ### Added
@@ -14,14 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fix: `di.As()` with nil causes panic
+- Fix: `di.As()` with nil causes panic.
 
 ## v1.0.1
 
 ### Fixed
 
 - `container.Provide` could not be called after container compilation now.
-- Improve error messages
+- Improve error messages.
 
 
 ## v1.0.0
