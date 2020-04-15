@@ -413,8 +413,9 @@ To avoid constant constructor changes, you can also use `di.Inject`.
 type Controller struct {
     di.Inject
 
-    users   UserService     `di:""`
-    friends FriendsService  `di:""`
+    // fields must be public
+    Users   UserService     `di:""`
+    Friends FriendsService  `di:""`
 }
 
 // NewController creates controller.
