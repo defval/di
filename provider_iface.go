@@ -41,7 +41,6 @@ func (i *providerInterface) ParameterList() parameterList {
 		name:     i.provider.ID().Name,
 		typ:      i.provider.ID().Type,
 		optional: false,
-		embed:    false,
 	})
 	return plist
 }

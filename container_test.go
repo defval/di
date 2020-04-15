@@ -39,6 +39,13 @@ func TestContainer_Compile(t *testing.T) {
 		c.MustProvide(func(int) int32 { return 0 })
 		require.EqualError(t, c.Compile(), "int32: dependency int not exists in container")
 	})
+
+	t.Run("recompilation cause error", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		require.EqualError(t, c.Compile(), "container already compiled, recompilation restricted")
+	})
 }
 
 func TestContainer_Resolve(t *testing.T) {
@@ -101,6 +108,16 @@ func TestContainer_Resolve(t *testing.T) {
 		c.MustResolvePtr(server, &extracted2)
 	})
 
+	t.Run("incorrect resolve cause error on compile", func(t *testing.T) {
+		c, err := di.New(
+			di.Resolve(&http.Server{}),
+		)
+		require.Nil(t, c)
+		require.NotNil(t, err)
+		require.Contains(t, err.Error(), "di.Resolve(..) failed:")
+		require.Contains(t, err.Error(), "goava/di/container_test.go")
+		require.Contains(t, err.Error(), ": http.Server: not exists in container")
+	})
 }
 
 func TestContainer_Resolve_Name(t *testing.T) {
@@ -328,6 +345,12 @@ func TestContainer_Provide(t *testing.T) {
 		err := c.Provide(func() *http.Server { return &http.Server{} }, di.As(nil))
 		require.EqualError(t, err, "nil: not a pointer to interface")
 	})
+
+	t.Run("provide after compilation cause error", func(t *testing.T) {
+		c := NewTestContainer(t)
+		c.MustCompile()
+		require.EqualError(t, c.Provide(func() {}), "dependency providing restricted after container compile")
+	})
 }
 
 func TestContainer_Has(t *testing.T) {
@@ -402,11 +425,26 @@ func TestContainer_ConstructorResolve(t *testing.T) {
 	})
 }
 
-func TestContainer_EmbedParameters(t *testing.T) {
-	t.Run("container resolve embed parameters", func(t *testing.T) {
+func TestContainer_Injectable(t *testing.T) {
+	t.Run("constructor with injectable", func(t *testing.T) {
+		c := NewTestContainer(t)
+		type InjectableType struct {
+			di.Inject
+			Mux *http.ServeMux `di:""`
+		}
+		mux := &http.ServeMux{}
+		c.MustProvide(func() *http.ServeMux { return mux })
+		c.MustProvide(func() *InjectableType { return &InjectableType{} })
+		c.MustCompile()
+		var result *InjectableType
+		c.MustResolve(&result)
+		require.NotNil(t, result.Mux)
+		c.MustEqualPointer(mux, result.Mux)
+	})
+	t.Run("container resolve injectable parameter", func(t *testing.T) {
 		c := NewTestContainer(t)
 		type Parameters struct {
-			di.Parameter
+			di.Inject
 			Server *http.Server `di:""`
 			File   *os.File     `di:""`
 		}
@@ -425,19 +463,62 @@ func TestContainer_EmbedParameters(t *testing.T) {
 		c.MustEqualPointer(server, extracted.server)
 		c.MustEqualPointer(file, extracted.file)
 	})
+	t.Run("not existing injectable field cause error", func(t *testing.T) {
+		c := NewTestContainer(t)
+		type InjectableType struct {
+			di.Inject
+			Mux *http.ServeMux `di:""`
+		}
+		c.MustProvide(func() *InjectableType { return &InjectableType{} })
+		require.EqualError(t, c.Compile(), "*di_test.InjectableType: dependency *http.ServeMux not exists in container")
+	})
+	t.Run("not existing and optional field set to nil", func(t *testing.T) {
+		c := NewTestContainer(t)
+		type InjectableType struct {
+			di.Inject
+			Mux *http.ServeMux `di:"" optional:"true"`
+		}
+		c.MustProvide(func() *InjectableType { return &InjectableType{} })
+		c.MustCompile()
+		var result *InjectableType
+		c.MustResolve(&result)
+		require.Nil(t, result.Mux)
+	})
+	t.Run("nested injectable field resolved correctly", func(t *testing.T) {
+		c := NewTestContainer(t)
+		type NestedInjectableType struct {
+			di.Inject
+			Mux *http.ServeMux `di:""`
+		}
+		type InjectableType struct {
+			di.Inject
+			Nested NestedInjectableType `di:""`
+		}
+		mux := &http.ServeMux{}
+		c.MustProvide(func() *InjectableType { return &InjectableType{} })
+		c.MustProvide(func() *http.ServeMux { return mux })
+		c.MustCompile()
+		var result *InjectableType
+		c.MustResolve(&result)
+		require.NotNil(t, result.Nested.Mux)
+		c.MustEqualPointer(mux, result.Nested.Mux)
+		var nit NestedInjectableType
+		c.MustResolve(&nit)
+		require.NotNil(t, nit)
+		c.MustEqualPointer(mux, nit.Mux)
+	})
 
 	t.Run("optional parameter may be nil", func(t *testing.T) {
 		c := NewTestContainer(t)
 		type Parameter struct {
-			di.Parameter
-			Server *http.Server `di:"optional"`
+			di.Inject
+			Server *http.Server `di:"" optional:"true"`
 		}
 		type Result struct {
 			server *http.Server
 		}
 		c.MustProvide(func(params Parameter) *Result { return &Result{server: params.Server} })
 		c.MustCompile()
-
 		var extracted *Result
 		c.MustResolve(&extracted)
 		require.Nil(t, extracted.server)
@@ -446,8 +527,8 @@ func TestContainer_EmbedParameters(t *testing.T) {
 	t.Run("optional group may be nil", func(t *testing.T) {
 		c := NewTestContainer(t)
 		type Params struct {
-			di.Parameter
-			Handlers []http.Handler `di:"optional"`
+			di.Inject
+			Handlers []http.Handler `di:"optional" optional:"true"`
 		}
 		c.MustProvide(func(params Params) bool {
 			return params.Handlers == nil
@@ -460,30 +541,38 @@ func TestContainer_EmbedParameters(t *testing.T) {
 
 	t.Run("skip private fields", func(t *testing.T) {
 		c := NewTestContainer(t)
-		type Param struct {
-			di.Parameter
-			private    []http.Handler `di:"optional"`
-			Addrs      []net.Addr     `di:"optional"`
+		type InjectableParameter struct {
+			di.Inject
+			private    []http.Handler `di:""`
+			Addrs      []net.Addr     `di:"" optional:"true"`
 			HaveNotTag string
 		}
-		c.MustProvide(func(param Param) bool {
+		type InjectableType struct {
+			di.Inject
+			private    []http.Handler `di:""`
+			Addrs      []net.Addr     `di:"" optional:"true"`
+			HaveNotTag string
+		}
+		c.MustProvide(func(param InjectableParameter) bool {
 			return param.Addrs == nil
 		})
+		c.MustProvide(func() *InjectableType { return &InjectableType{} })
 		c.MustCompile()
 		var extracted bool
 		c.MustResolve(&extracted)
 		require.True(t, extracted)
+		var result *InjectableType
+		c.MustResolve(&result)
 	})
-
-	t.Run("resolving embed parameter cause error", func(t *testing.T) {
+	t.Run("resolving not provided injectable cause error", func(t *testing.T) {
 		c := NewTestContainer(t)
 		require.NoError(t, c.Compile())
 		type Parameter struct {
-			di.Parameter
+			di.Inject
 			Server *http.Server `di:""`
 		}
 		var p Parameter
-		require.EqualError(t, c.Resolve(&p), "resolve target must be a pointer, got di.Parameter")
+		require.EqualError(t, c.Resolve(&p), "di_test.Parameter: not exists in container")
 	})
 }
 

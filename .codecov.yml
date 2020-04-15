@@ -6,7 +6,7 @@ coverage:
     project:
       default:
         enabled: yes
-        target: 90
+        target: 89
         if_not_found: success
         if_ci_failed: error
     patch:

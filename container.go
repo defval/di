@@ -102,12 +102,6 @@ func (c *Container) Provide(constructor Constructor, options ...ProvideOption) (
 	}
 	// add provider to graph
 	c.graph.AddNode(providerNode{prov})
-	// parse embed parameters
-	for _, param := range prov.ParameterList() {
-		if param.embed {
-			c.graph.AddNode(providerNode{providerFromEmbedParameter(param)})
-		}
-	}
 	iprovs := make([]*providerInterface, 0, len(params.Interfaces))
 	// process interfaces
 	for _, i := range params.Interfaces {
@@ -152,12 +146,16 @@ func (c *Container) Compile(_ ...CompileOption) error {
 	for _, node := range c.graph.Nodes() {
 		provider := node.(providerNode)
 		for _, param := range provider.ParameterList() {
-			// node parameter provider
+			// parameter provider
 			pp, exists := param.ResolveProvider(c)
 			if exists {
 				if err := c.graph.AddEdge(pp.ID(), provider.ID(), 1); err != nil {
 					return err
 				}
+				continue
+			}
+			if !exists && isInjectable(param.typ) {
+				c.graph.AddNode(providerNode{providerFromInjectableParameter(param)})
 				continue
 			}
 			if !exists && !param.optional {
@@ -202,11 +200,7 @@ func (c *Container) Resolve(into interface{}, options ...ResolveOption) error {
 	for _, opt := range options {
 		opt.apply(&params)
 	}
-
 	typ := reflect.TypeOf(into).Elem()
-	if isEmbedParameter(typ) {
-		return fmt.Errorf("resolve target must be a pointer, got di.Parameter")
-	}
 	param := parameter{
 		name: params.Name,
 		typ:  typ,
@@ -248,9 +242,8 @@ func (c *Container) Has(target interface{}, options ...ResolveOption) bool {
 	}
 	typ := reflect.TypeOf(target)
 	param := parameter{
-		name:  params.Name,
-		typ:   typ.Elem(),
-		embed: isEmbedParameter(typ.Elem()),
+		name: params.Name,
+		typ:  typ.Elem(),
 	}
 	_, exists := param.ResolveProvider(c)
 	return exists
@@ -261,11 +254,6 @@ func (c *Container) Cleanup() {
 	for i := len(c.cleanups) - 1; i >= 0; i-- {
 		c.cleanups[i]()
 	}
-}
-
-// Parameter is embed helper that indicates that type is a constructor embed parameter.
-type Parameter struct {
-	internalParameter
 }
 
 // struct that contains constructor with options.

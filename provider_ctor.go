@@ -1,7 +1,6 @@
 package di
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 
@@ -22,10 +21,19 @@ const (
 // providerConstructor is a provider that can handle constructor functions.
 // Type of this provider provides type with function call.
 type providerConstructor struct {
-	name     string
-	ctor     reflection.Func
+	name string
+	// constructor
 	ctorType ctorType
-	clean    *reflection.Func
+	call     reflection.Func
+	// injectable params
+	injectable struct {
+		// params parsed once
+		params []parameter
+		// field numbers parsed once
+		fields []int
+	}
+	// clean callback
+	clean *reflection.Func
 }
 
 // newProviderConstructor creates new constructor provider with name as additional identity key.
@@ -33,48 +41,82 @@ func newProviderConstructor(name string, constructor interface{}) (*providerCons
 	if constructor == nil {
 		return nil, fmt.Errorf("constructor must be a function like func([dep1, dep2, ...]) (<result>, [cleanup, error]), got nil")
 	}
-	fn, isFunc := reflection.InspectFunc(constructor)
-	if !isFunc {
+	fn, isFn := reflection.InspectFunc(constructor)
+	if !isFn {
 		return nil, fmt.Errorf("constructor must be a function like func([dep1, dep2, ...]) (<result>, [cleanup, error]), got %s", reflect.TypeOf(constructor))
 	}
 	ctorType := determineCtorType(fn)
 	if ctorType == ctorUnknown {
 		return nil, fmt.Errorf("constructor must be a function like func([dep1, dep2, ...]) (<result>, [cleanup, error]), got %s", reflect.TypeOf(constructor))
 	}
-	return &providerConstructor{
+	provider := &providerConstructor{
 		name:     name,
-		ctor:     fn,
-		ctorType: determineCtorType(fn),
-	}, nil
+		call:     fn,
+		ctorType: ctorType,
+	}
+	// result type
+	rt := fn.Out(0)
+	// if struct is injectable, range over injectableFields and parse injectable params
+	if isInjectable(rt) {
+		provider.injectable.params, provider.injectable.fields = parseInjectableType(rt)
+	}
+	return provider, nil
 }
 
 // ID returns provider resultant type id.
 func (c providerConstructor) ID() id {
 	return id{
 		Name: c.name,
-		Type: c.ctor.Out(0),
+		Type: c.call.Out(0),
 	}
 }
 
 // ParameterList returns constructor parameter list.
-func (c providerConstructor) ParameterList() parameterList {
-	var plist parameterList
-	for i := 0; i < c.ctor.NumIn(); i++ {
-		typ := c.ctor.In(i)
-		p := parameter{
-			// name:     "",
-			typ:      typ,
-			optional: false,
-			embed:    isEmbedParameter(typ),
-		}
-		plist = append(plist, p)
+func (c *providerConstructor) ParameterList() parameterList {
+	// todo: move to constructor
+	var pl parameterList
+	for i := 0; i < c.call.NumIn(); i++ {
+		in := c.call.In(i)
+		pl = append(pl, parameter{
+			name: "", // constructor parameters could be resolved only with empty ("") name
+			typ:  in,
+		})
 	}
-	return plist
+	return append(pl, c.injectable.params...)
 }
 
 // Provide provides resultant.
 func (c *providerConstructor) Provide(values ...reflect.Value) (reflect.Value, func(), error) {
-	out := reflection.CallResult(c.ctor.Call(values))
+	// constructor last param index
+	clpi := c.call.NumIn()
+	if c.call.NumIn() == 0 {
+		clpi = 0
+	}
+	out := reflection.CallResult(c.call.Call(values[:clpi]))
+	if c.ctorType == ctorError && out.Error(1) != nil {
+		return out.Result(), nil, out.Error(1)
+	}
+	if c.ctorType == ctorCleanupError && out.Error(2) != nil {
+		return out.Result(), nil, out.Error(2)
+	}
+	// set injectable fields
+	if len(c.injectable.fields) > 0 {
+		// result value
+		rv := out.Result()
+		if rv.Kind() == reflect.Ptr {
+			rv = rv.Elem()
+		}
+		fields := values[clpi:]
+		// field index
+		for i, value := range fields {
+			// field value
+			fv := rv.Field(c.injectable.fields[i])
+			if !fv.CanSet() {
+				panic("you found a bug, please create new issue for this: https://github.com/goava/di/issues/new")
+			}
+			fv.Set(value)
+		}
+	}
 	switch c.ctorType {
 	case ctorStd:
 		return out.Result(), nil, nil
@@ -85,8 +127,7 @@ func (c *providerConstructor) Provide(values ...reflect.Value) (reflect.Value, f
 	case ctorCleanupError:
 		return out.Result(), out.Cleanup(), out.Error(2)
 	}
-	return reflect.Value{}, nil, errors.New("you found a bug, please create new issue for " +
-		"this: https://github.com/goava/di/issues/new")
+	panic("you found a bug, please create new issue for this: https://github.com/goava/di/issues/new")
 }
 
 // determineCtorType

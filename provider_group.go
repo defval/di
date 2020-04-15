@@ -31,7 +31,6 @@ func (i *providerGroup) Add(k id) {
 		name:     k.Name,
 		typ:      k.Type,
 		optional: false,
-		embed:    false,
 	})
 }
 

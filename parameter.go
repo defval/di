@@ -4,17 +4,11 @@ import (
 	"reflect"
 )
 
-// isEmbedParameter
-func isEmbedParameter(typ reflect.Type) bool {
-	return typ.Kind() == reflect.Struct && typ.Implements(parameterInterface)
-}
-
 // parameterRequired
 type parameter struct {
 	name     string       // string identifier
 	typ      reflect.Type // resultant type
 	optional bool         // optional flag
-	embed    bool         // embed flag
 }
 
 // String represents parameter as string.
@@ -63,11 +57,3 @@ func (p parameter) ResolveValue(c *Container) (reflect.Value, error) {
 	}
 	return value, nil
 }
-
-// internalParameter
-type internalParameter interface {
-	isDependencyInjectionParameter()
-}
-
-// parameterInterface
-var parameterInterface = reflect.TypeOf(new(internalParameter)).Elem()
