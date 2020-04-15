@@ -344,7 +344,7 @@ di.Provide(NewMasterDatabase, di.WithName("master"))
 di.Provide(NewSlaveDatabase, di.WithName("slave"))
 ```
 
-If you need to extract it from container use `di.Name()` extract
+If you need to resolve it from container use `di.Name()` resolve
 option.
 
 ```go
@@ -352,13 +352,13 @@ var db *Database
 container.Resolve(&db, di.Name("master"))
 ```
 
-If you need to provide named definition in other constructor use
-`di.Parameter` with embedding.
+If you need to provide named definition in another constructor embed
+`di.Inject`.
 
 ```go
 // ServiceParameters
 type ServiceParameters struct {
-	di.Parameter
+	di.Inject
 	
 	// use `di` tag for the container to know that field need to be injected.
 	MasterDatabase *Database `di:"master"`
@@ -376,15 +376,15 @@ func NewService(parameters ServiceParameters) *Service {
 
 ### Optional parameters
 
-Also `di.Parameter` provide ability to skip dependency if it not exists
-in container.
+Also, `di.Inject` with tag `optional` provide ability to skip dependency if it not exists
+in the container.
 
 ```go
 // ServiceParameter
 type ServiceParameter struct {
-	di.Parameter
+	di.Inject
 	
-	Logger *Logger `di:"optional"`
+	Logger *Logger `di:"" optional:"true"`
 }
 ```
 
@@ -396,12 +396,33 @@ You can use naming and optional together.
 ```go
 // ServiceParameter
 type ServiceParameter struct {
-	di.Parameter
+	di.Inject
 	
 	StdOutLogger *Logger `di:"stdout"`
-	FileLogger   *Logger `di:"file,optional"`
+	FileLogger   *Logger `di:"file" optional:"true"`
 }
 ```
+
+### Fill struct
+
+To avoid constant constructor changes, you can also use `di.Inject`.
+
+```go
+// Controller has some endpoints.
+type Controller struct {
+    di.Inject
+
+    users   UserService     `di:""`
+    friends FriendsService  `di:""`
+}
+
+// NewController creates controller.
+func NewController() *Controller {
+    return &Controller{}
+}
+```
+
+> Note, that such a constructor will be incorrect without using `di`
 
 ### Prototypes
 

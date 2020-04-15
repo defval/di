@@ -4,14 +4,14 @@ import (
 	"reflect"
 )
 
-// Injectable indicates that public fields with special tag type will be injected automatically.
+// Inject indicates that public fields with special tag type will be injected automatically.
 //
 //	type MyType struct {
-//		di.Injectable
+//		di.Inject
 //
 //		Server *http.Server `di:""` // will be injected
 //	}
-type Injectable struct {
+type Inject struct {
 	injectable
 }
 

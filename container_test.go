@@ -429,7 +429,7 @@ func TestContainer_Injectable(t *testing.T) {
 	t.Run("constructor with injectable", func(t *testing.T) {
 		c := NewTestContainer(t)
 		type InjectableType struct {
-			di.Injectable
+			di.Inject
 			Mux *http.ServeMux `di:""`
 		}
 		mux := &http.ServeMux{}
@@ -444,7 +444,7 @@ func TestContainer_Injectable(t *testing.T) {
 	t.Run("container resolve injectable parameter", func(t *testing.T) {
 		c := NewTestContainer(t)
 		type Parameters struct {
-			di.Injectable
+			di.Inject
 			Server *http.Server `di:""`
 			File   *os.File     `di:""`
 		}
@@ -466,7 +466,7 @@ func TestContainer_Injectable(t *testing.T) {
 	t.Run("not existing injectable field cause error", func(t *testing.T) {
 		c := NewTestContainer(t)
 		type InjectableType struct {
-			di.Injectable
+			di.Inject
 			Mux *http.ServeMux `di:""`
 		}
 		c.MustProvide(func() *InjectableType { return &InjectableType{} })
@@ -475,7 +475,7 @@ func TestContainer_Injectable(t *testing.T) {
 	t.Run("not existing and optional field set to nil", func(t *testing.T) {
 		c := NewTestContainer(t)
 		type InjectableType struct {
-			di.Injectable
+			di.Inject
 			Mux *http.ServeMux `di:"" optional:"true"`
 		}
 		c.MustProvide(func() *InjectableType { return &InjectableType{} })
@@ -487,11 +487,11 @@ func TestContainer_Injectable(t *testing.T) {
 	t.Run("nested injectable field resolved correctly", func(t *testing.T) {
 		c := NewTestContainer(t)
 		type NestedInjectableType struct {
-			di.Injectable
+			di.Inject
 			Mux *http.ServeMux `di:""`
 		}
 		type InjectableType struct {
-			di.Injectable
+			di.Inject
 			Nested NestedInjectableType `di:""`
 		}
 		mux := &http.ServeMux{}
@@ -511,7 +511,7 @@ func TestContainer_Injectable(t *testing.T) {
 	t.Run("optional parameter may be nil", func(t *testing.T) {
 		c := NewTestContainer(t)
 		type Parameter struct {
-			di.Injectable
+			di.Inject
 			Server *http.Server `di:"" optional:"true"`
 		}
 		type Result struct {
@@ -527,7 +527,7 @@ func TestContainer_Injectable(t *testing.T) {
 	t.Run("optional group may be nil", func(t *testing.T) {
 		c := NewTestContainer(t)
 		type Params struct {
-			di.Injectable
+			di.Inject
 			Handlers []http.Handler `di:"optional" optional:"true"`
 		}
 		c.MustProvide(func(params Params) bool {
@@ -542,13 +542,13 @@ func TestContainer_Injectable(t *testing.T) {
 	t.Run("skip private fields", func(t *testing.T) {
 		c := NewTestContainer(t)
 		type InjectableParameter struct {
-			di.Injectable
+			di.Inject
 			private    []http.Handler `di:""`
 			Addrs      []net.Addr     `di:"" optional:"true"`
 			HaveNotTag string
 		}
 		type InjectableType struct {
-			di.Injectable
+			di.Inject
 			private    []http.Handler `di:""`
 			Addrs      []net.Addr     `di:"" optional:"true"`
 			HaveNotTag string
@@ -568,7 +568,7 @@ func TestContainer_Injectable(t *testing.T) {
 		c := NewTestContainer(t)
 		require.NoError(t, c.Compile())
 		type Parameter struct {
-			di.Injectable
+			di.Inject
 			Server *http.Server `di:""`
 		}
 		var p Parameter
