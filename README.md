@@ -25,6 +25,7 @@ extensible.
   - [Modules](https://github.com/goava/di#modules)
   - [Named definitions](https://github.com/goava/di#named-definitions)
   - [Optional parameters](https://github.com/goava/di#optional-parameters)
+  - [Fill struct](https://github.com/goava/di#fill-struct)
   - [Prototypes](https://github.com/goava/di#prototypes)
   - [Cleanup](https://github.com/goava/di#cleanup)
   - [Compile](https://github.com/goava/di#compile)
