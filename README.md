@@ -32,7 +32,7 @@ extensible.
 ## Documentation
 
 You can use standard [pkg.go.dev](https://pkg.go.dev/github.com/goava/di) and inline code
-comments or if you does not have experience with auto-wiring libraries
+comments or if you do not have experience with auto-wiring libraries
 as [google/wire](https://github.com/google/wire),
 [uber-go/dig](https://github.com/uber-go/dig) or another start with
 [tutorial](https://github.com/goava/di#tutorial).
