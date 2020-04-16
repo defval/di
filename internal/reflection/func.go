@@ -5,11 +5,6 @@ import (
 	"runtime"
 )
 
-// IsFunc check that value have function type.
-func IsFunc(value interface{}) bool {
-	return reflect.ValueOf(value).Kind() == reflect.Func
-}
-
 // Func is a function description.
 type Func struct {
 	Name string
@@ -19,7 +14,7 @@ type Func struct {
 
 // InspectFunc inspects function.
 func InspectFunc(fn interface{}) (Func, bool) {
-	if !IsFunc(fn) {
+	if reflect.ValueOf(fn).Kind() != reflect.Func {
 		return Func{}, false
 	}
 	val := reflect.ValueOf(fn)
