@@ -28,7 +28,6 @@ extensible.
   - [Fill struct](https://github.com/goava/di#fill-struct)
   - [Prototypes](https://github.com/goava/di#prototypes)
   - [Cleanup](https://github.com/goava/di#cleanup)
-  - [Compile](https://github.com/goava/di#compile)
 
 ## Documentation
 
@@ -471,26 +470,3 @@ if err != nil {
 // do something
 container.Cleanup() // file was closed
 ```
-
-### Compile
-
-With `WithCompile()` container option you can eject compile stage from `New()`.
-
-```go
-container, err := di.New(
-    di.WithCompile(),	
-)
-if err != nil {
-	// handle error
-}
-if err = container.Compile(); err != nil {
-    // handle error
-}
-```
-
-`Compile` compiles the container: parses constructors, builds
-dependency graph, checks that it is acyclic, calls initial invokes and resolves.
-
-> In this case, you can see that container building consists of two stages: `New()` and `Compile()`.
-> This can be useful when you divide the code into several layers and will start control 
-> build flow of application.

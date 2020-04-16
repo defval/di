@@ -19,7 +19,7 @@ type Option interface {
 func Provide(constructor Constructor, options ...ProvideOption) Option {
 	frame := stacktrace.CallerFrame(0)
 	return containerOption(func(c *Container) {
-		c.provides = append(c.provides, provideOptions{
+		c.initial.provides = append(c.initial.provides, provideOptions{
 			frame,
 			constructor,
 			options,
@@ -46,8 +46,7 @@ func Provide(constructor Constructor, options ...ProvideOption) Option {
 // Third result is a optional error. Sometimes our types cannot be constructed :(
 type Constructor interface{}
 
-// ProvideOption is a functional option interface that modify provide behaviour. See di.As(), di.WithName()
-// and di.Prototype().
+// ProvideOption is a functional option interface that modify provide behaviour. See di.As(), di.WithName().
 type ProvideOption interface {
 	apply(params *ProvideParams)
 }
@@ -116,35 +115,12 @@ func WithName(name string) ProvideOption {
 	})
 }
 
-// Prototype modifies Provide() behavior. By default, each type resolves as a singleton. This option sets that
-// each type resolving creates a new instance of the type.
-//
-//		container, err := di.New(
-// 			Provide(NewHTTPServer, inject.Prototype())
-//		)
-//		if err != nil {
-//			// handle error
-//		}
-// 		var server1, server2 *http.Server
-// 		if err := container.Resolve(&server1); err != nil {
-//			// handle error
-//		}
-//		if err := container.Resolve(&server2); err != nil {
-//			// handle error
-//		}
-//
-func Prototype() ProvideOption {
-	return provideOption(func(params *ProvideParams) {
-		params.IsPrototype = true
-	})
-}
-
 // Resolve returns container options that resolves type into target. All resolves will be done on compile stage
 // after call invokes.
 func Resolve(target interface{}, options ...ResolveOption) Option {
 	frame := stacktrace.CallerFrame(0)
 	return containerOption(func(c *Container) {
-		c.resolves = append(c.resolves, resolveOptions{
+		c.initial.resolves = append(c.initial.resolves, resolveOptions{
 			frame,
 			target,
 			options,
@@ -157,7 +133,7 @@ func Resolve(target interface{}, options ...ResolveOption) Option {
 func Invoke(fn Invocation, options ...InvokeOption) Option {
 	frame := stacktrace.CallerFrame(0)
 	return containerOption(func(c *Container) {
-		c.invokes = append(c.invokes, invokeOptions{
+		c.initial.invokes = append(c.initial.invokes, invokeOptions{
 			frame,
 			fn,
 			options,
@@ -208,13 +184,15 @@ func WithLogger(logger Logger) Option {
 }
 
 // WithCompile puts the container compilation into a separate function.
+// Deprecated: Compile deprecated
 func WithCompile() Option {
 	return containerOption(func(c *Container) {
-		c.mcf = true
+		// c.mcf = true
 	})
 }
 
 // CompileOption is a functional option that change compile behaviour.
+// Deprecated: Compile deprecated
 type CompileOption interface {
 	apply(c *Container)
 }
@@ -222,9 +200,8 @@ type CompileOption interface {
 // ProvideParams is a Provide() method options. Name is a unique identifier of type instance. Provider is a constructor
 // function. Interfaces is a interface that implements a provider result type.
 type ProvideParams struct {
-	Name        string
-	Interfaces  []Interface
-	IsPrototype bool
+	Name       string
+	Interfaces []Interface
 }
 
 func (p ProvideParams) apply(params *ProvideParams) {
@@ -267,10 +244,6 @@ type ResolveParams struct {
 func (p ResolveParams) apply(params *ResolveParams) {
 	*params = p
 }
-
-type compileOption func(c *Container)
-
-func (o compileOption) apply(c *Container) { o(c) }
 
 type containerOption func(c *Container)
 

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/goava/di/internal/graph"
 	"github.com/goava/di/internal/reflection"
 	"github.com/goava/di/internal/stacktrace"
 )
@@ -35,10 +34,10 @@ import (
 //	}
 func New(options ...Option) (_ *Container, err error) {
 	c := &Container{
-		compiled: false,
-		graph:    graph.New(),
-		cleanups: make([]func(), 0, 8),
-		logger:   nopLogger{},
+		logger:    nopLogger{},
+		providers: map[id]provider{},
+		values:    map[id]reflect.Value{},
+		cleanups:  []func(){},
 	}
 	// apply container options
 	for _, opt := range options {
@@ -46,7 +45,7 @@ func New(options ...Option) (_ *Container, err error) {
 	}
 	// process constructors
 	provideErr := errProvideFailed{}
-	for _, provide := range c.provides {
+	for _, provide := range c.initial.provides {
 		if err := c.Provide(provide.constructor, provide.options...); err != nil {
 			provideErr = provideErr.Append(provide.frame, err)
 		}
@@ -54,9 +53,18 @@ func New(options ...Option) (_ *Container, err error) {
 	if len(provideErr) > 0 {
 		return nil, provideErr
 	}
-	if !c.mcf {
-		if err := c.Compile(); err != nil {
-			return nil, err
+	// error omitted because if logger could not be resolve it will be default
+	_ = c.Resolve(&c.logger)
+	// call initial invokes
+	for _, invoke := range c.initial.invokes {
+		if err := c.Invoke(invoke.fn, invoke.options...); err != nil {
+			return nil, errInvokeFailed{invoke.frame, err}
+		}
+	}
+	// initial resolves
+	for _, resolve := range c.initial.resolves {
+		if err := c.Resolve(resolve.target, resolve.options...); err != nil {
+			return nil, errResolveFailed{resolve.frame, err}
 		}
 	}
 	return c, nil
@@ -64,23 +72,24 @@ func New(options ...Option) (_ *Container, err error) {
 
 // Container is a dependency injection container.
 type Container struct {
-	mcf      bool             // manual compile flow - if true compile will not be called on New()
-	compiled bool             // compile state
-	graph    *graph.Graph     // graph storage
-	provides []provideOptions // initial provides
-	invokes  []invokeOptions  // initial invokes
-	resolves []resolveOptions // initial resolves
-	cleanups []func()         // cleanup functions
-	logger   Logger           // internal logger
+	// internal logger
+	logger Logger
+	// initial options
+	initial struct {
+		provides []provideOptions
+		invokes  []invokeOptions
+		resolves []resolveOptions
+	}
+	providers map[id]provider
+	values    map[id]reflect.Value
+	// cleanups
+	cleanups []func()
 }
 
 // Provide provides to container reliable way to build type. The constructor will be invoked lazily on-demand.
 // For more information about constructors see Constructor interface. ProvideOption can add additional behavior to
 // the process of type resolving.
 func (c *Container) Provide(constructor Constructor, options ...ProvideOption) (err error) {
-	if c.compiled {
-		return fmt.Errorf("dependency providing restricted after container compile")
-	}
 	params := ProvideParams{}
 	// apply provide options
 	for _, opt := range options {
@@ -91,94 +100,53 @@ func (c *Container) Provide(constructor Constructor, options ...ProvideOption) (
 	if prov, err = newProviderConstructor(params.Name, constructor); err != nil {
 		return err
 	}
-	// if provider already exists replace it to stub
-	if c.graph.Exists(prov.ID()) {
+	if _, ok := c.providers[prov.ID()]; ok {
 		// duplicate types not allowed
 		return fmt.Errorf("%s already exists in dependency graph", prov.ID())
 	}
-	// if prototype option provided wrap provider as singleton
-	if !params.IsPrototype {
-		prov = asSingleton(prov)
-	}
 	// add provider to graph
-	c.graph.AddNode(providerNode{prov})
-	iprovs := make([]*providerInterface, 0, len(params.Interfaces))
+	c.providers[prov.ID()] = prov
+	if err := c.processInterfaces(prov, params.Interfaces); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Container) processInterfaces(prov provider, interfaces []Interface) error {
+	iprovs := make([]*providerInterface, 0, len(interfaces))
 	// process interfaces
-	for _, i := range params.Interfaces {
+	for _, i := range interfaces {
 		// create interface provider
 		iprov, err := newProviderInterface(prov, i)
 		if err != nil {
 			return err
 		}
-		if !c.graph.AddNode(providerNode{iprov}) {
-			// if graph node already exists, resolve it as interface restricted
-			// but in group may exists
+		_, ok := c.providers[iprov.ID()]
+		if !ok {
+			c.providers[iprov.ID()] = iprov
+		}
+		if ok {
+			// todo: do not change if already stub
+			// if graph node already exists, resolve it as interface restricted, but it can exists in group
 			stub := newProviderStub(iprov.ID(), "have several implementations")
-			c.graph.Replace(providerNode{stub})
+			c.providers[iprov.ID()] = stub
 		}
 		iprovs = append(iprovs, iprov)
 	}
 	// process group for interfaces
 	for _, iprov := range iprovs {
-		group := newProviderGroup(iprov.ID())
-		// if group node already exists use it
-		if !c.graph.AddNode(providerNode{group}) {
-			// if node add returns false graph node already exists
-			// error can be omitted
-			existing, _ := c.graph.Node(group.ID())
-			group = existing.(providerNode).provider.(*providerGroup)
+		groupID := id{
+			Type: reflect.SliceOf(iprov.ID().Type),
 		}
-		group.Add(iprov.provider.ID())
-	}
-	return nil
-}
-
-// Compile compiles the container. First, it iterates over all definitions and register their
-// parameters. Container links definitions with each other and checks that result dependency graph is not cyclic.
-// In final, the container invoke functions provided by di.Invoke() container option and resolves types
-// provided by di.Resolve() container option. Between invokes and resolves, the container tries to find di.Logger
-// interface, and if it is found sets it as an internal logger.
-func (c *Container) Compile(_ ...CompileOption) error {
-	if c.compiled {
-		return fmt.Errorf("container already compiled, recompilation restricted")
-	}
-	// connect graph nodes, register provider parameters
-	for _, node := range c.graph.Nodes() {
-		provider := node.(providerNode)
-		for _, param := range provider.ParameterList() {
-			// parameter provider
-			pp, exists := param.ResolveProvider(c)
-			if exists {
-				if err := c.graph.AddEdge(pp.ID(), provider.ID(), 1); err != nil {
-					return err
-				}
-				continue
-			}
-			if !exists && isInjectable(param.typ) {
-				c.graph.AddNode(providerNode{providerFromInjectableParameter(param)})
-				continue
-			}
-			if !exists && !param.optional {
-				return fmt.Errorf("%s: dependency %s not exists in container", provider.ID(), param)
-			}
+		existing, ok := c.providers[groupID]
+		if ok {
+			// if group node already exists use it
+			existing.(*providerGroup).Add(prov.ID())
 		}
-	}
-	if err := graph.CheckCycles(c.graph); err != nil {
-		return err
-	}
-	c.compiled = true
-	// error omitted because if logger could not be resolve it will be default
-	_ = c.Resolve(&c.logger)
-	// call initial invokes
-	for _, invoke := range c.invokes {
-		if err := c.Invoke(invoke.fn, invoke.options...); err != nil {
-			return errInvokeFailed{invoke.frame, err}
-		}
-	}
-	// initial resolves
-	for _, resolve := range c.resolves {
-		if err := c.Resolve(resolve.target, resolve.options...); err != nil {
-			return errResolveFailed{resolve.frame, err}
+		if !ok {
+			group := newProviderGroup(iprov.ID())
+			group.Add(prov.ID())
+			c.providers[groupID] = group
 		}
 	}
 	return nil
@@ -186,9 +154,6 @@ func (c *Container) Compile(_ ...CompileOption) error {
 
 // Resolve builds instance of target type and fills target pointer.
 func (c *Container) Resolve(into interface{}, options ...ResolveOption) error {
-	if !c.compiled {
-		return fmt.Errorf("container not compiled, resolve dependencies possible only after compilation")
-	}
 	if into == nil {
 		return fmt.Errorf("resolve target must be a pointer, got nil")
 	}
@@ -216,9 +181,6 @@ func (c *Container) Resolve(into interface{}, options ...ResolveOption) error {
 
 // Invoke calls provided function.
 func (c *Container) Invoke(fn Invocation, options ...InvokeOption) error {
-	if !c.compiled {
-		return fmt.Errorf("container not compiled, function invokes possible only after compilation")
-	}
 	// params := InvokeParams{}
 	// for _, opt := range options {
 	// 	opt.apply(&params)

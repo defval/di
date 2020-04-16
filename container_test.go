@@ -14,67 +14,30 @@ import (
 	"github.com/goava/di"
 )
 
-func TestContainer_Compile(t *testing.T) {
-	t.Run("cycle cause error", func(t *testing.T) {
-		c := NewTestContainer(t)
-		// bool -> int32 -> int64 -> bool
-		c.MustProvide(func(int32) bool { return true })
-		c.MustProvide(func(int64) int32 { return 0 })
-		c.MustProvide(func(bool) int64 { return 0 })
-		// additional provides for error check.
-		c.MustProvide(func(bool) uint64 { return 0 })
-		c.MustProvide(func(int64) uint { return 0 })
-		c.MustProvide(func(uint) uint8 { return 0 })
-		err := c.Compile()
-		require.NotNil(t, err)
-		// after container switch to use unordered map it can start compile with any provider
-		f1 := err.Error() == "[bool int32 int64 bool] cycle detected"
-		f2 := err.Error() == "[int64 bool int32 int64] cycle detected"
-		f3 := err.Error() == "[int32 int64 bool int32] cycle detected"
-		require.True(t, f1 || f2 || f3)
-	})
-
-	t.Run("not existing dependency cause compile error", func(t *testing.T) {
-		c := NewTestContainer(t)
-		c.MustProvide(func(int) int32 { return 0 })
-		require.EqualError(t, c.Compile(), "int32: dependency int not exists in container")
-	})
-
-	t.Run("recompilation cause error", func(t *testing.T) {
-		c, err := di.New()
-		require.NoError(t, err)
-		require.NotNil(t, c)
-		require.EqualError(t, c.Compile(), "container already compiled, recompilation restricted")
-	})
-}
-
 func TestContainer_Resolve(t *testing.T) {
 	t.Run("resolve into nil cause error", func(t *testing.T) {
 		c := NewTestContainer(t)
-		c.MustCompile()
 		err := c.Resolve(nil)
 		require.EqualError(t, err, "resolve target must be a pointer, got nil")
 	})
 
 	t.Run("resolve into struct cause error", func(t *testing.T) {
 		c := NewTestContainer(t)
-		c.MustCompile()
 		err := c.Resolve(struct{}{})
 		require.EqualError(t, err, "resolve target must be a pointer, got struct {}")
 	})
 
 	t.Run("resolve into string cause error", func(t *testing.T) {
 		c := NewTestContainer(t)
-		c.MustCompile()
 		err := c.Resolve("string")
 		require.EqualError(t, err, "resolve target must be a pointer, got string")
 	})
 
-	t.Run("resolve with not compiled container cause error", func(t *testing.T) {
+	t.Run("resolve returns error because dependency not exists", func(t *testing.T) {
 		c := NewTestContainer(t)
-		var extracted *http.Server
-		err := c.Resolve(&extracted)
-		require.EqualError(t, err, "container not compiled, resolve dependencies possible only after compilation")
+		c.MustProvide(func(int) int32 { return 0 })
+		var i int32
+		require.EqualError(t, c.Resolve(&i), "int32: dependency int not exists in container")
 	})
 
 	t.Run("resolve returns error because dependency constructing failed", func(t *testing.T) {
@@ -82,7 +45,6 @@ func TestContainer_Resolve(t *testing.T) {
 		c.MustProvide(func() (*http.Server, error) {
 			return &http.Server{}, fmt.Errorf("server build failed")
 		})
-		c.MustCompile()
 		var server *http.Server
 		err := c.Resolve(&server)
 		require.EqualError(t, err, "*http.Server: server build failed")
@@ -92,7 +54,6 @@ func TestContainer_Resolve(t *testing.T) {
 		c := NewTestContainer(t)
 		server := &http.Server{}
 		c.MustProvide(func() *http.Server { return server })
-		c.MustCompile()
 		var extracted *http.Server
 		c.MustResolvePtr(server, &extracted)
 	})
@@ -101,7 +62,6 @@ func TestContainer_Resolve(t *testing.T) {
 		c := NewTestContainer(t)
 		server := &http.Server{}
 		c.MustProvide(func() *http.Server { return server })
-		c.MustCompile()
 		var extracted1 *http.Server
 		c.MustResolvePtr(server, &extracted1)
 		var extracted2 *http.Server
@@ -126,8 +86,6 @@ func TestContainer_Resolve_Name(t *testing.T) {
 		foo := &http.Server{}
 		err := c.Provide(func() *http.Server { return foo }, di.WithName("server"))
 		require.NoError(t, err)
-		c.MustCompile()
-
 		var extracted *http.Server
 		err = c.Resolve(&extracted)
 		require.EqualError(t, err, "*http.Server: not exists in container")
@@ -142,7 +100,6 @@ func TestContainer_Resolve_Interface(t *testing.T) {
 		c := NewTestContainer(t)
 		c.MustProvide(func() *http.Server { return &http.Server{} }, new(io.Closer))
 		c.MustProvide(func() *os.File { return &os.File{} }, new(io.Closer))
-		c.MustCompile()
 		var closer io.Closer
 		err := c.Resolve(&closer)
 		require.EqualError(t, err, "io.Closer: have several implementations")
@@ -155,24 +112,9 @@ func TestContainer_Resolve_Interface(t *testing.T) {
 		c.MustProvide(func(handler http.Handler) *http.Server {
 			return &http.Server{Handler: handler}
 		})
-		c.MustCompile()
 		var server *http.Server
 		c.MustResolve(&server)
 		c.MustEqualPointer(mux, server.Handler)
-	})
-}
-
-func TestContainer_Prototype(t *testing.T) {
-	t.Run("container resolve new instance of prototype by each resolve", func(t *testing.T) {
-		c := NewTestContainer(t)
-		err := c.Provide(func() *http.Server { return &http.Server{} }, di.Prototype())
-		require.NoError(t, err)
-		c.MustCompile()
-		var extracted1 *http.Server
-		c.MustResolve(&extracted1)
-		var extracted2 *http.Server
-		c.MustResolve(&extracted2)
-		c.MustNotEqualPointer(extracted1, extracted2)
 	})
 }
 
@@ -183,8 +125,6 @@ func TestContainer_Group(t *testing.T) {
 		file := &os.File{}
 		c.MustProvide(func() *http.Server { return server }, new(io.Closer))
 		c.MustProvide(func() *os.File { return file }, new(io.Closer))
-		c.MustCompile()
-
 		var group []io.Closer
 		c.MustResolve(&group)
 		require.Len(t, group, 2)
@@ -200,22 +140,14 @@ func TestContainer_Group(t *testing.T) {
 		c.MustProvide(func() *os.File { return file }, new(io.Closer))
 		type Closers []io.Closer
 		c.MustProvide(func(closers []io.Closer) Closers { return closers })
-		c.MustCompile()
 		var closers Closers
 		c.MustResolve(&closers)
 		c.MustEqualPointer(server, closers[0])
 		c.MustEqualPointer(file, closers[1])
 	})
 
-	t.Run("invocation before compile cause error", func(t *testing.T) {
-		c := NewTestContainer(t)
-		err := c.Invoke(func() {})
-		require.EqualError(t, err, "container not compiled, function invokes possible only after compilation")
-	})
-
 	t.Run("incorrect signature", func(t *testing.T) {
 		c := NewTestContainer(t)
-		c.MustCompile()
 		err := c.Invoke(func() *http.Server { return &http.Server{} })
 		require.EqualError(t, err, "invoke function must be a function like `func([dep1, dep2, ...]) [error]`, got func() *http.Server")
 	})
@@ -224,14 +156,12 @@ func TestContainer_Group(t *testing.T) {
 func TestContainer_Invoke(t *testing.T) {
 	t.Run("invocation function with not provided dependency cause error", func(t *testing.T) {
 		c := NewTestContainer(t)
-		c.MustCompile()
 		err := c.Invoke(func(server *http.Server) {})
 		require.EqualError(t, err, "resolve invocation (github.com/goava/di_test.TestContainer_Invoke.func1.1): *http.Server: not exists in container")
 	})
 
 	t.Run("invoke with nil error must be called", func(t *testing.T) {
 		c := NewTestContainer(t)
-		c.MustCompile()
 		var invokeCalled bool
 		c.MustInvoke(func() error {
 			invokeCalled = true
@@ -244,7 +174,6 @@ func TestContainer_Invoke(t *testing.T) {
 		c := NewTestContainer(t)
 		server := &http.Server{}
 		c.MustProvide(func() *http.Server { return server })
-		c.MustCompile()
 		c.MustInvoke(func(in *http.Server) {
 			c.MustEqualPointer(server, in)
 		})
@@ -252,13 +181,31 @@ func TestContainer_Invoke(t *testing.T) {
 
 	t.Run("invoke return correct error", func(t *testing.T) {
 		c := NewTestContainer(t)
-		c.MustCompile()
 		err := c.Invoke(func() error { return fmt.Errorf("invoke error") })
 		require.EqualError(t, err, "invoke error")
 	})
 }
 
 func TestContainer_Provide(t *testing.T) {
+	// t.Run("cycle cause error", func(t *testing.T) {
+	// 	c := NewTestContainer(t)
+	// 	// bool -> int32 -> int64 -> bool
+	// 	c.MustProvide(func(int32) bool { return true })
+	// 	c.MustProvide(func(int64) int32 { return 0 })
+	// 	c.MustProvide(func(bool) int64 { return 0 })
+	// 	// additional provides for error check.
+	// 	c.MustProvide(func(bool) uint64 { return 0 })
+	// 	c.MustProvide(func(int64) uint { return 0 })
+	// 	c.MustProvide(func(uint) uint8 { return 0 })
+	// 	err := c.Compile()
+	// 	require.NotNil(t, err)
+	// 	// after container switch to use unordered map it can start compile with any provider
+	// 	f1 := err.Error() == "[bool int32 int64 bool] cycle detected"
+	// 	f2 := err.Error() == "[int64 bool int32 int64] cycle detected"
+	// 	f3 := err.Error() == "[int32 int64 bool int32] cycle detected"
+	// 	require.True(t, f1 || f2 || f3)
+	// })
+
 	t.Run("simple constructor", func(t *testing.T) {
 		c := NewTestContainer(t)
 		c.MustProvide(func() *http.Server { return &http.Server{} })
@@ -345,12 +292,6 @@ func TestContainer_Provide(t *testing.T) {
 		err := c.Provide(func() *http.Server { return &http.Server{} }, di.As(nil))
 		require.EqualError(t, err, "nil: not a pointer to interface")
 	})
-
-	t.Run("provide after compilation cause error", func(t *testing.T) {
-		c := NewTestContainer(t)
-		c.MustCompile()
-		require.EqualError(t, c.Provide(func() {}), "dependency providing restricted after container compile")
-	})
 }
 
 func TestContainer_Has(t *testing.T) {
@@ -360,20 +301,17 @@ func TestContainer_Has(t *testing.T) {
 	})
 	t.Run("exists nil returns false", func(t *testing.T) {
 		c := NewTestContainer(t)
-		c.MustCompile()
 		require.False(t, c.Has(nil))
 	})
 	t.Run("exists return true if type exists", func(t *testing.T) {
 		c := NewTestContainer(t)
 		c.MustProvide(func() *http.Server { return &http.Server{} })
-		c.MustCompile()
 		var server *http.Server
 		require.True(t, c.Has(&server))
 	})
 
 	t.Run("exists return false if type not exists", func(t *testing.T) {
 		c := NewTestContainer(t)
-		c.MustCompile()
 		var server *http.Server
 		require.False(t, c.Has(&server))
 	})
@@ -381,7 +319,6 @@ func TestContainer_Has(t *testing.T) {
 	t.Run("exists interface", func(t *testing.T) {
 		c := NewTestContainer(t)
 		c.MustProvide(func() *http.Server { return &http.Server{} }, new(io.Closer))
-		c.MustCompile()
 		var server io.Closer
 		require.True(t, c.Has(&server))
 	})
@@ -390,23 +327,8 @@ func TestContainer_Has(t *testing.T) {
 		c := NewTestContainer(t)
 		err := c.Provide(func() *http.Server { return &http.Server{} }, di.WithName("server"))
 		require.NoError(t, err)
-		c.MustCompile()
 		var server *http.Server
 		require.True(t, c.Has(&server, di.Name("server")))
-	})
-
-	t.Run("has works on not compiled container", func(t *testing.T) {
-		type hasServer func(server *http.Server) error
-		c, err := di.New(
-			di.Provide(func() *http.Server {
-				return &http.Server{}
-			}),
-			di.WithCompile(),
-		)
-		require.NoError(t, err)
-		var server *http.Server
-		require.True(t, c.Has(&server))
-		require.NoError(t, c.Compile())
 	})
 }
 
@@ -418,7 +340,6 @@ func TestContainer_ConstructorResolve(t *testing.T) {
 		c.MustProvide(func(mux *http.ServeMux) *http.Server {
 			return &http.Server{Handler: mux}
 		})
-		c.MustCompile()
 		var server *http.Server
 		c.MustResolve(&server)
 		c.MustEqualPointer(mux, server.Handler)
@@ -435,7 +356,6 @@ func TestContainer_Injectable(t *testing.T) {
 		mux := &http.ServeMux{}
 		c.MustProvide(func() *http.ServeMux { return mux })
 		c.MustProvide(func() *InjectableType { return &InjectableType{} })
-		c.MustCompile()
 		var result *InjectableType
 		c.MustResolve(&result)
 		require.NotNil(t, result.Mux)
@@ -457,7 +377,6 @@ func TestContainer_Injectable(t *testing.T) {
 			file   *os.File
 		}
 		c.MustProvide(func(params Parameters) *Result { return &Result{params.Server, params.File} })
-		c.MustCompile()
 		var extracted *Result
 		c.MustResolve(&extracted)
 		c.MustEqualPointer(server, extracted.server)
@@ -470,7 +389,8 @@ func TestContainer_Injectable(t *testing.T) {
 			Mux *http.ServeMux `di:""`
 		}
 		c.MustProvide(func() *InjectableType { return &InjectableType{} })
-		require.EqualError(t, c.Compile(), "*di_test.InjectableType: dependency *http.ServeMux not exists in container")
+		var result *InjectableType
+		require.EqualError(t, c.Resolve(&result), "*di_test.InjectableType: dependency *http.ServeMux not exists in container")
 	})
 	t.Run("not existing and optional field set to nil", func(t *testing.T) {
 		c := NewTestContainer(t)
@@ -479,7 +399,6 @@ func TestContainer_Injectable(t *testing.T) {
 			Mux *http.ServeMux `di:"" optional:"true"`
 		}
 		c.MustProvide(func() *InjectableType { return &InjectableType{} })
-		c.MustCompile()
 		var result *InjectableType
 		c.MustResolve(&result)
 		require.Nil(t, result.Mux)
@@ -497,7 +416,6 @@ func TestContainer_Injectable(t *testing.T) {
 		mux := &http.ServeMux{}
 		c.MustProvide(func() *InjectableType { return &InjectableType{} })
 		c.MustProvide(func() *http.ServeMux { return mux })
-		c.MustCompile()
 		var result *InjectableType
 		c.MustResolve(&result)
 		require.NotNil(t, result.Nested.Mux)
@@ -518,7 +436,6 @@ func TestContainer_Injectable(t *testing.T) {
 			server *http.Server
 		}
 		c.MustProvide(func(params Parameter) *Result { return &Result{server: params.Server} })
-		c.MustCompile()
 		var extracted *Result
 		c.MustResolve(&extracted)
 		require.Nil(t, extracted.server)
@@ -533,7 +450,6 @@ func TestContainer_Injectable(t *testing.T) {
 		c.MustProvide(func(params Params) bool {
 			return params.Handlers == nil
 		})
-		c.MustCompile()
 		var extracted bool
 		c.MustResolve(&extracted)
 		require.True(t, extracted)
@@ -557,7 +473,6 @@ func TestContainer_Injectable(t *testing.T) {
 			return param.Addrs == nil
 		})
 		c.MustProvide(func() *InjectableType { return &InjectableType{} })
-		c.MustCompile()
 		var extracted bool
 		c.MustResolve(&extracted)
 		require.True(t, extracted)
@@ -566,13 +481,12 @@ func TestContainer_Injectable(t *testing.T) {
 	})
 	t.Run("resolving not provided injectable cause error", func(t *testing.T) {
 		c := NewTestContainer(t)
-		require.NoError(t, c.Compile())
 		type Parameter struct {
 			di.Inject
 			Server *http.Server `di:""`
 		}
 		var p Parameter
-		require.EqualError(t, c.Resolve(&p), "di_test.Parameter: not exists in container")
+		require.EqualError(t, c.Resolve(&p), "di_test.Parameter: dependency *http.Server not exists in container")
 	})
 }
 
@@ -583,7 +497,6 @@ func TestContainer_Cleanup(t *testing.T) {
 		c.MustProvide(func() (*http.Server, func()) {
 			return &http.Server{}, func() { cleanupCalled = true }
 		})
-		c.MustCompile()
 		var extracted *http.Server
 		c.MustResolve(&extracted)
 		c.Cleanup()
@@ -599,38 +512,16 @@ func TestContainer_Cleanup(t *testing.T) {
 		c.MustProvide(func() (*http.ServeMux, func()) {
 			return &http.ServeMux{}, func() { cleanupCalls = append(cleanupCalls, "mux") }
 		}, new(http.Handler))
-		c.MustCompile()
 		var server *http.Server
 		c.MustResolve(&server)
 		c.Cleanup()
 		require.Equal(t, []string{"server", "mux"}, cleanupCalls)
 	})
-
-	t.Run("cleanup for every prototype instance", func(t *testing.T) {
-		c := NewTestContainer(t)
-		var cleanupCalls []string
-		err := c.Provide(func() (*http.Server, func()) {
-			return &http.Server{}, func() {
-				cleanupCalls = append(cleanupCalls, fmt.Sprintf("server_%d", len(cleanupCalls)))
-			}
-		}, di.ProvideParams{
-			IsPrototype: true,
-		})
-		require.NoError(t, err)
-		c.MustCompile()
-		var server0, server1 *http.Server
-		c.MustResolve(&server0)
-		c.MustResolve(&server1)
-		c.Cleanup()
-		require.Equal(t, []string{"server_0", "server_1"}, cleanupCalls)
-	})
 }
 
 // NewTestContainer
 func NewTestContainer(t *testing.T) *TestContainer {
-	c, err := di.New(
-		di.WithCompile(),
-	)
+	c, err := di.New()
 	require.NoError(t, err)
 	return &TestContainer{t, c}
 }
@@ -641,13 +532,13 @@ type TestContainer struct {
 	*di.Container
 }
 
+func (c *TestContainer) Compile() error {
+	return nil
+}
+
 func (c *TestContainer) MustProvide(provider interface{}, as ...di.Interface) {
 	err := c.Provide(provider, di.ProvideParams{Interfaces: as})
 	require.NoError(c.t, err)
-}
-
-func (c *TestContainer) MustCompile() {
-	require.NoError(c.t, c.Compile())
 }
 
 func (c *TestContainer) MustResolve(target interface{}) {
