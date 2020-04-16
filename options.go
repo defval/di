@@ -115,6 +115,30 @@ func WithName(name string) ProvideOption {
 	})
 }
 
+// Prototype modifies Provide() behavior. By default, each type resolves as a singleton. This option sets that
+// each type resolving creates a new instance of the type.
+//
+//		container, err := di.New(
+// 			Provide(NewHTTPServer, inject.Prototype())
+//		)
+//		if err != nil {
+//			// handle error
+//		}
+// 		var server1, server2 *http.Server
+// 		if err := container.Resolve(&server1); err != nil {
+//			// handle error
+//		}
+//		if err := container.Resolve(&server2); err != nil {
+//			// handle error
+//		}
+//
+// todo: reimplement
+func Prototype() ProvideOption {
+	return provideOption(func(params *ProvideParams) {
+		params.IsPrototype = true
+	})
+}
+
 // Resolve returns container options that resolves type into target. All resolves will be done on compile stage
 // after call invokes.
 func Resolve(target interface{}, options ...ResolveOption) Option {
@@ -200,8 +224,9 @@ type CompileOption interface {
 // ProvideParams is a Provide() method options. Name is a unique identifier of type instance. Provider is a constructor
 // function. Interfaces is a interface that implements a provider result type.
 type ProvideParams struct {
-	Name       string
-	Interfaces []Interface
+	Name        string
+	Interfaces  []Interface
+	IsPrototype bool
 }
 
 func (p ProvideParams) apply(params *ProvideParams) {

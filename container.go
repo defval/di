@@ -53,6 +53,9 @@ func New(options ...Option) (_ *Container, err error) {
 	if len(provideErr) > 0 {
 		return nil, provideErr
 	}
+	if err := c.Provide(func() *Container { return c }); err != nil {
+		return nil, err
+	}
 	// error omitted because if logger could not be resolve it will be default
 	_ = c.Resolve(&c.logger)
 	// call initial invokes
