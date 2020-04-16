@@ -532,10 +532,6 @@ type TestContainer struct {
 	*di.Container
 }
 
-func (c *TestContainer) Compile() error {
-	return nil
-}
-
 func (c *TestContainer) MustProvide(provider interface{}, as ...di.Interface) {
 	err := c.Provide(provider, di.ProvideParams{Interfaces: as})
 	require.NoError(c.t, err)
