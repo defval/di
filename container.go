@@ -56,9 +56,7 @@ func New(options ...Option) (_ *Container, err error) {
 		return nil, provideErr
 	}
 	// provide container to advanced usage e.g. conditional providing
-	if err := c.Provide(func() *Container { return c }); err != nil {
-		return nil, err
-	}
+	_ = c.Provide(func() *Container { return c })
 	// error omitted because if logger could not be resolved it will be default
 	_ = c.Resolve(&c.logger)
 	// initial invokes

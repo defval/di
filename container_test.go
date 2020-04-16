@@ -78,6 +78,15 @@ func TestContainer_Resolve(t *testing.T) {
 		require.Contains(t, err.Error(), "goava/di/container_test.go")
 		require.Contains(t, err.Error(), ": http.Server: not exists in container")
 	})
+
+	t.Run("container resolve", func(t *testing.T) {
+		var resolved *di.Container
+		c, err := di.New(
+			di.Resolve(&resolved),
+		)
+		require.NoError(t, err)
+		require.Equal(t, fmt.Sprintf("%p", c), fmt.Sprintf("%p", resolved))
+	})
 }
 
 func TestContainer_Resolve_Name(t *testing.T) {
