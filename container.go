@@ -3,47 +3,49 @@ package di
 import (
 	"fmt"
 	"reflect"
-
-	"github.com/goava/di/internal/reflection"
-	"github.com/goava/di/internal/stacktrace"
 )
 
-// New creates new container with provided options. Example usage:
+// New constructs container with provided options. Example usage (simplified):
+//
+// Define constructors and invocations:
 //
 // 	func NewHTTPServer(mux *http.ServeMux) *http.Server {
 // 		return &http.Server{
 // 			Handler: mux,
 // 		}
 // 	}
+//
 // 	func NewHTTPServeMux() *http.ServeMux {
 // 		return http.ServeMux{}
 // 	}
 //
-// Container initialization code:
+// 	func StartServer(server *http.Server) error {
+//		return server.ListenAndServe()
+//	}
+//
+// Use it with container:
 //
 // 	container, err := di.New(
 // 		di.Provide(NewHTTPServer),
 // 		di.Provide(NewHTTPServeMux),
+//		di.Invoke(StartServer),
 // 	)
 // 	if err != nil {
 //		// handle error
 //	}
-//	var server *http.Server
-//	if err := c.Resolve(&server); err != nil {
-//		// handle error
-//	}
 func New(options ...Option) (_ *Container, err error) {
 	c := &Container{
-		logger:    nopLogger{},
-		providers: map[id]provider{},
-		values:    map[id]reflect.Value{},
-		cleanups:  []func(){},
+		logger:     nopLogger{},
+		providers:  map[id]provider{},
+		values:     map[id]reflect.Value{},
+		prototypes: map[id]bool{},
+		cleanups:   []func(){},
 	}
 	// apply container options
 	for _, opt := range options {
 		opt.apply(c)
 	}
-	// process constructors
+	// initial providing
 	provideErr := errProvideFailed{}
 	for _, provide := range c.initial.provides {
 		if err := c.Provide(provide.constructor, provide.options...); err != nil {
@@ -53,12 +55,13 @@ func New(options ...Option) (_ *Container, err error) {
 	if len(provideErr) > 0 {
 		return nil, provideErr
 	}
+	// provide container to advanced usage e.g. conditional providing
 	if err := c.Provide(func() *Container { return c }); err != nil {
 		return nil, err
 	}
-	// error omitted because if logger could not be resolve it will be default
+	// error omitted because if logger could not be resolved it will be default
 	_ = c.Resolve(&c.logger)
-	// call initial invokes
+	// initial invokes
 	for _, invoke := range c.initial.invokes {
 		if err := c.Invoke(invoke.fn, invoke.options...); err != nil {
 			return nil, errInvokeFailed{invoke.frame, err}
@@ -75,40 +78,53 @@ func New(options ...Option) (_ *Container, err error) {
 
 // Container is a dependency injection container.
 type Container struct {
-	// internal logger
+	// Logger that logs internal actions.
 	logger Logger
-	// initial options
+	// Initial options will be processed on di.New().
 	initial struct {
+		// Array of di.Provide() options.
 		provides []provideOptions
-		invokes  []invokeOptions
+		// Array of di.Invoke() options.
+		invokes []invokeOptions
+		// Array of di.Resolve() options.
 		resolves []resolveOptions
 	}
+	// Mapping from id to provider that can provide value for that id.
 	providers map[id]provider
-	values    map[id]reflect.Value
-	// cleanups
+	// Mapping from id to already instantiated value for that id.
+	values map[id]reflect.Value
+	// Prototype mapping.
+	prototypes map[id]bool
+	// Array of provider cleanups.
 	cleanups []func()
 }
 
 // Provide provides to container reliable way to build type. The constructor will be invoked lazily on-demand.
 // For more information about constructors see Constructor interface. ProvideOption can add additional behavior to
 // the process of type resolving.
-func (c *Container) Provide(constructor Constructor, options ...ProvideOption) (err error) {
+func (c *Container) Provide(constructor Constructor, options ...ProvideOption) error {
 	params := ProvideParams{}
 	// apply provide options
 	for _, opt := range options {
 		opt.apply(&params)
 	}
 	// create constructor provider
-	var prov provider
-	if prov, err = newProviderConstructor(params.Name, constructor); err != nil {
+	prov, err := newProviderConstructor(params.Name, constructor)
+	if err != nil {
 		return err
+	}
+	cleanup := prov.ctorType == ctorCleanup || prov.ctorType == ctorCleanupError
+	if cleanup && params.IsPrototype {
+		return fmt.Errorf("%s: cleanup not supported with prototype providers", prov.ID())
 	}
 	if _, ok := c.providers[prov.ID()]; ok {
 		// duplicate types not allowed
 		return fmt.Errorf("%s already exists in dependency graph", prov.ID())
 	}
-	// add provider to graph
 	c.providers[prov.ID()] = prov
+	// save prototype flag
+	c.prototypes[prov.ID()] = params.IsPrototype
+	// process di.As() options and create group of interfaces
 	if err := c.processInterfaces(prov, params.Interfaces); err != nil {
 		return err
 	}
@@ -124,13 +140,13 @@ func (c *Container) processInterfaces(prov provider, interfaces []Interface) err
 		if err != nil {
 			return err
 		}
-		_, ok := c.providers[iprov.ID()]
+		existing, ok := c.providers[iprov.ID()]
 		if !ok {
 			c.providers[iprov.ID()] = iprov
 		}
-		if ok {
-			// todo: do not change if already stub
-			// if graph node already exists, resolve it as interface restricted, but it can exists in group
+		// if provider already exists resolve it as interface restricted, but it can exists in group
+		_, alreadyStub := existing.(*providerStub)
+		if ok && !alreadyStub {
 			stub := newProviderStub(iprov.ID(), "have several implementations")
 			c.providers[iprov.ID()] = stub
 		}
@@ -155,12 +171,17 @@ func (c *Container) processInterfaces(prov provider, interfaces []Interface) err
 	return nil
 }
 
-// Resolve builds instance of target type and fills target pointer.
+// Resolve resolves type and fills target pointer.
+//
+//	var server *http.Server
+//	if err := container.Resolve(&server); err != nil {
+//		// handle error
+//	}
 func (c *Container) Resolve(into interface{}, options ...ResolveOption) error {
 	if into == nil {
 		return fmt.Errorf("resolve target must be a pointer, got nil")
 	}
-	if !reflection.IsPtr(into) {
+	if reflect.ValueOf(into).Kind() != reflect.Ptr {
 		return fmt.Errorf("resolve target must be a pointer, got %s", reflect.TypeOf(into))
 	}
 	params := ResolveParams{}
@@ -182,7 +203,8 @@ func (c *Container) Resolve(into interface{}, options ...ResolveOption) error {
 	return nil
 }
 
-// Invoke calls provided function.
+// Invoke calls the function fn. It parses function parameters. Looks for it in a container.
+// And invokes function with them. See Invocation for details.
 func (c *Container) Invoke(fn Invocation, options ...InvokeOption) error {
 	// params := InvokeParams{}
 	// for _, opt := range options {
@@ -196,8 +218,15 @@ func (c *Container) Invoke(fn Invocation, options ...InvokeOption) error {
 }
 
 // Has checks that type exists in container, if not it return false.
-func (c *Container) Has(target interface{}, options ...ResolveOption) bool {
-	if target == nil {
+//
+// 	var server *http.Server
+//	if container.Has(&server) {
+//		// handle server existence
+//	}
+//
+// It like Resolve() but doesn't instantiate a type.
+func (c *Container) Has(into interface{}, options ...ResolveOption) bool {
+	if into == nil {
 		return false
 	}
 	params := ResolveParams{}
@@ -205,7 +234,7 @@ func (c *Container) Has(target interface{}, options ...ResolveOption) bool {
 	for _, opt := range options {
 		opt.apply(&params)
 	}
-	typ := reflect.TypeOf(target)
+	typ := reflect.TypeOf(into)
 	param := parameter{
 		name: params.Name,
 		typ:  typ.Elem(),
@@ -219,25 +248,4 @@ func (c *Container) Cleanup() {
 	for i := len(c.cleanups) - 1; i >= 0; i-- {
 		c.cleanups[i]()
 	}
-}
-
-// struct that contains constructor with options.
-type provideOptions struct {
-	frame       stacktrace.Frame
-	constructor Constructor
-	options     []ProvideOption
-}
-
-// struct that contains invoke function with options.
-type invokeOptions struct {
-	frame   stacktrace.Frame
-	fn      Invocation
-	options []InvokeOption
-}
-
-// struct that container resolve target with options.
-type resolveOptions struct {
-	frame   stacktrace.Frame
-	target  interface{}
-	options []ResolveOption
 }

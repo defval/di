@@ -118,6 +118,19 @@ func TestContainer_Resolve_Interface(t *testing.T) {
 	})
 }
 
+func TestContainer_Prototype(t *testing.T) {
+	t.Run("container resolve new instance of prototype by each resolve", func(t *testing.T) {
+		c := NewTestContainer(t)
+		err := c.Provide(func() *http.Server { return &http.Server{} }, di.Prototype())
+		require.NoError(t, err)
+		var extracted1 *http.Server
+		c.MustResolve(&extracted1)
+		var extracted2 *http.Server
+		c.MustResolve(&extracted2)
+		c.MustNotEqualPointer(extracted1, extracted2)
+	})
+}
+
 func TestContainer_Group(t *testing.T) {
 	t.Run("create group and resolve it", func(t *testing.T) {
 		c := NewTestContainer(t)
@@ -516,6 +529,16 @@ func TestContainer_Cleanup(t *testing.T) {
 		c.MustResolve(&server)
 		c.Cleanup()
 		require.Equal(t, []string{"server", "mux"}, cleanupCalls)
+	})
+
+	t.Run("cleanup with prototype cause error", func(t *testing.T) {
+		c := NewTestContainer(t)
+		err := c.Provide(func() (*http.Server, func()) {
+			return &http.Server{}, func() {}
+		}, di.ProvideParams{
+			IsPrototype: true,
+		})
+		require.EqualError(t, err, "*http.Server: cleanup not supported with prototype providers")
 	})
 }
 

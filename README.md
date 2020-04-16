@@ -434,8 +434,6 @@ If you want to create a new instance on each extraction use
 di.Provide(NewRequestContext, di.Prototype())
 ```
 
-> todo: real use case
-
 ### Cleanup
 
 If a provider creates a value that needs to be cleaned up, then it can

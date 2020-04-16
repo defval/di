@@ -37,7 +37,7 @@ func TestOptions(t *testing.T) {
 		require.Equal(t, resolvedServer, server)
 	})
 
-	t.Run("provide failed on compile", func(t *testing.T) {
+	t.Run("provide failed", func(t *testing.T) {
 		c, err := di.New(
 			di.Provide(func() {}),
 		)
@@ -47,7 +47,7 @@ func TestOptions(t *testing.T) {
 		require.Contains(t, err.Error(), "options_test.go:42: constructor must be a function like func([dep1, dep2, ...]) (<result>, [cleanup, error]), got func()")
 	})
 
-	t.Run("invoke failed on compile", func(t *testing.T) {
+	t.Run("invoke failed", func(t *testing.T) {
 		c, err := di.New(
 			di.Invoke(func(string2 string) {}),
 		)
