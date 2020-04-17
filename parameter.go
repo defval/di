@@ -53,13 +53,13 @@ func (p parameter) ResolveValue(c *Container) (reflect.Value, error) {
 		return reflect.New(p.typ).Elem(), nil
 	}
 	if !exists {
-		return reflect.Value{}, ErrParameterProviderNotFound{param: p}
+		return reflect.Value{}, errParameterProviderNotFound{param: p}
 	}
 	pl := provider.ParameterList()
 	values, err := pl.Resolve(c)
 	if err != nil {
 		switch cerr := err.(type) {
-		case ErrParameterProviderNotFound:
+		case errParameterProviderNotFound:
 			return reflect.Value{}, fmt.Errorf("%s: dependency %s not exists in container", p, cerr.param)
 		default:
 			return reflect.Value{}, fmt.Errorf("%s: %s", p, err)
@@ -72,7 +72,7 @@ func (p parameter) ResolveValue(c *Container) (reflect.Value, error) {
 	}
 	value, cleanup, err := provider.Provide(values...)
 	if err != nil {
-		return value, ErrParameterProvideFailed{id: provider.ID(), err: err}
+		return value, errParameterProvideFailed{id: provider.ID(), err: err}
 	}
 	c.values[provider.ID()] = value
 	if cleanup != nil {

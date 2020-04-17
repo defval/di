@@ -1,6 +1,8 @@
 package di_test
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -43,8 +45,9 @@ func TestOptions(t *testing.T) {
 		)
 		require.Nil(t, c)
 		require.NotNil(t, err)
-		require.Contains(t, err.Error(), "di.Provide(..) failed:")
-		require.Contains(t, err.Error(), "options_test.go:42: constructor must be a function like func([dep1, dep2, ...]) (<result>, [cleanup, error]), got func()")
+		fmt.Println(err)
+		require.Contains(t, err.Error(), "options_test.go:")
+		require.Contains(t, err.Error(), ": invalid constructor signature, got func()")
 	})
 
 	t.Run("invoke failed", func(t *testing.T) {
@@ -52,8 +55,19 @@ func TestOptions(t *testing.T) {
 			di.Invoke(func(string2 string) {}),
 		)
 		require.Nil(t, c)
-		require.NotNil(t, err)
-		require.Contains(t, err.Error(), "di.Invoke(..) failed:")
-		require.Contains(t, err.Error(), "options_test.go:52: resolve invocation (github.com/goava/di_test.TestOptions.func3.1): string: not exists in container")
+		require.Error(t, err)
+		fmt.Println(err)
+		require.Contains(t, err.Error(), "options_test.go:")
+		require.Contains(t, err.Error(), ": type string not exists in container")
+	})
+
+	t.Run("invoke error return as is if not internal error", func(t *testing.T) {
+		var myError = errors.New("my error")
+		_, err := di.New(
+			di.Invoke(func() error {
+				return myError
+			}),
+		)
+		require.True(t, err == myError)
 	})
 }

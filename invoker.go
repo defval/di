@@ -2,7 +2,6 @@ package di
 
 import (
 	"fmt"
-	"reflect"
 
 	"github.com/goava/di/internal/reflection"
 )
@@ -30,21 +29,14 @@ type invoker struct {
 	fn  reflection.Func
 }
 
-func newInvoker(fn interface{}) (*invoker, error) {
-	if fn == nil {
-		return nil, fmt.Errorf("invoke function must be a function like `func([dep1, dep2, ...]) [error]`, got %s", "nil")
-	}
-	inspected, isFn := reflection.InspectFunc(fn)
-	if !isFn {
-		return nil, fmt.Errorf("invoke function must be a function like `func([dep1, dep2, ...]) [error]`, got %s", reflect.TypeOf(fn))
-	}
-	typ, err := determineInvokerType(inspected)
+func newInvoker(fn reflection.Func) (*invoker, error) {
+	typ, err := determineInvokerType(fn)
 	if err != nil {
 		return nil, err
 	}
 	return &invoker{
 		typ: typ,
-		fn:  inspected,
+		fn:  fn,
 	}, nil
 }
 
@@ -52,7 +44,7 @@ func (i *invoker) Invoke(c *Container) error {
 	plist := i.parameters()
 	values, err := plist.Resolve(c)
 	if err != nil {
-		return fmt.Errorf("resolve invocation (%s): %s", i.fn.Name, err)
+		return err
 	}
 	results := reflection.CallResult(i.fn.Call(values))
 	if len(results) == 0 {

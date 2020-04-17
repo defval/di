@@ -37,17 +37,10 @@ type providerConstructor struct {
 }
 
 // newProviderConstructor creates new constructor provider with name as additional identity key.
-func newProviderConstructor(name string, constructor interface{}) (*providerConstructor, error) {
-	if constructor == nil {
-		return nil, fmt.Errorf("constructor must be a function like func([dep1, dep2, ...]) (<result>, [cleanup, error]), got nil")
-	}
-	fn, isFn := reflection.InspectFunc(constructor)
-	if !isFn {
-		return nil, fmt.Errorf("constructor must be a function like func([dep1, dep2, ...]) (<result>, [cleanup, error]), got %s", reflect.TypeOf(constructor))
-	}
+func newProviderConstructor(name string, fn reflection.Func) (*providerConstructor, error) {
 	ctorType := determineCtorType(fn)
 	if ctorType == ctorUnknown {
-		return nil, fmt.Errorf("constructor must be a function like func([dep1, dep2, ...]) (<result>, [cleanup, error]), got %s", reflect.TypeOf(constructor))
+		return nil, fmt.Errorf("invalid constructor signature, got %s", fn.Type)
 	}
 	provider := &providerConstructor{
 		name:     name,

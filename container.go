@@ -3,6 +3,8 @@ package di
 import (
 	"fmt"
 	"reflect"
+
+	"github.com/goava/di/internal/reflection"
 )
 
 // New constructs container with provided options. Example usage (simplified):
@@ -46,29 +48,36 @@ func New(options ...Option) (_ *Container, err error) {
 		opt.apply(c)
 	}
 	// initial providing
-	provideErr := errProvideFailed{}
 	for _, provide := range c.initial.provides {
-		if err := c.Provide(provide.constructor, provide.options...); err != nil {
-			provideErr = provideErr.Append(provide.frame, err)
+		err := c.provide(provide.constructor, provide.options...)
+		if err != nil {
+			return nil, ErrProvideFailed{
+				provide.frame,
+				err,
+			}
 		}
 	}
-	if len(provideErr) > 0 {
-		return nil, provideErr
-	}
 	// provide container to advanced usage e.g. conditional providing
-	_ = c.Provide(func() *Container { return c })
+	_ = c.provide(func() *Container { return c })
 	// error omitted because if logger could not be resolved it will be default
-	_ = c.Resolve(&c.logger)
+	_ = c.resolve(&c.logger)
 	// initial invokes
 	for _, invoke := range c.initial.invokes {
-		if err := c.Invoke(invoke.fn, invoke.options...); err != nil {
-			return nil, errInvokeFailed{invoke.frame, err}
+		err := c.invoke(invoke.fn, invoke.options...)
+		if err != nil {
+			switch err.(type) {
+			case errParameterProviderNotFound, errParameterProvideFailed:
+				return nil, ErrInvokeFailed{invoke.frame, err}
+			default:
+				// return error as is if not container error
+				return nil, err
+			}
 		}
 	}
 	// initial resolves
 	for _, resolve := range c.initial.resolves {
-		if err := c.Resolve(resolve.target, resolve.options...); err != nil {
-			return nil, errResolveFailed{resolve.frame, err}
+		if err := c.resolve(resolve.target, resolve.options...); err != nil {
+			return nil, ErrResolveFailed{resolve.frame, err}
 		}
 	}
 	return c, nil
@@ -101,30 +110,44 @@ type Container struct {
 // For more information about constructors see Constructor interface. ProvideOption can add additional behavior to
 // the process of type resolving.
 func (c *Container) Provide(constructor Constructor, options ...ProvideOption) error {
+	if err := c.provide(constructor, options...); err != nil {
+		return provideErrWithStack(err)
+	}
+	return nil
+}
+
+func (c *Container) provide(constructor Constructor, options ...ProvideOption) error {
+	if constructor == nil {
+		return provideErrWithStack(fmt.Errorf("invalid constructor signature, got nil"))
+	}
+	fn, isFn := reflection.InspectFunc(constructor)
+	if !isFn {
+		return provideErrWithStack(fmt.Errorf("invalid constructor signature, got %s", reflect.TypeOf(constructor)))
+	}
 	params := ProvideParams{}
 	// apply provide options
 	for _, opt := range options {
 		opt.apply(&params)
 	}
 	// create constructor provider
-	prov, err := newProviderConstructor(params.Name, constructor)
+	prov, err := newProviderConstructor(params.Name, fn)
 	if err != nil {
-		return err
+		return provideErrWithStack(err)
 	}
 	cleanup := prov.ctorType == ctorCleanup || prov.ctorType == ctorCleanupError
 	if cleanup && params.IsPrototype {
-		return fmt.Errorf("%s: cleanup not supported with prototype providers", prov.ID())
+		return provideErrWithStack(fmt.Errorf("cleanup not supported with prototype providers"))
 	}
 	if _, ok := c.providers[prov.ID()]; ok {
 		// duplicate types not allowed
-		return fmt.Errorf("%s already exists in dependency graph", prov.ID())
+		return provideErrWithStack(fmt.Errorf("%s already exists in dependency graph", prov.ID()))
 	}
 	c.providers[prov.ID()] = prov
 	// save prototype flag
 	c.prototypes[prov.ID()] = params.IsPrototype
 	// process di.As() options and create group of interfaces
 	if err := c.processInterfaces(prov, params.Interfaces); err != nil {
-		return err
+		return provideErrWithStack(err)
 	}
 	return nil
 }
@@ -176,6 +199,13 @@ func (c *Container) processInterfaces(prov provider, interfaces []Interface) err
 //		// handle error
 //	}
 func (c *Container) Resolve(into interface{}, options ...ResolveOption) error {
+	if err := c.resolve(into, options...); err != nil {
+		return resolveErrWithStack(err)
+	}
+	return nil
+}
+
+func (c *Container) resolve(into interface{}, options ...ResolveOption) error {
 	if into == nil {
 		return fmt.Errorf("resolve target must be a pointer, got nil")
 	}
@@ -203,16 +233,39 @@ func (c *Container) Resolve(into interface{}, options ...ResolveOption) error {
 
 // Invoke calls the function fn. It parses function parameters. Looks for it in a container.
 // And invokes function with them. See Invocation for details.
-func (c *Container) Invoke(fn Invocation, options ...InvokeOption) error {
+func (c *Container) Invoke(invocation Invocation, options ...InvokeOption) error {
+	if err := c.invoke(invocation, options...); err != nil {
+		switch err.(type) {
+		case errParameterProviderNotFound, errParameterProvideFailed:
+			return invokeErrWithStack(err)
+		default:
+			// return error as is
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *Container) invoke(invocation Invocation, options ...InvokeOption) error {
 	// params := InvokeParams{}
 	// for _, opt := range options {
 	// 	opt.apply(&params)
 	// }
+	if invocation == nil {
+		return fmt.Errorf("invalid invocation signature, got %s", "nil")
+	}
+	fn, isFn := reflection.InspectFunc(invocation)
+	if !isFn {
+		return fmt.Errorf("invalid invocation signature, got %s", reflect.TypeOf(fn))
+	}
 	invoker, err := newInvoker(fn)
 	if err != nil {
 		return err
 	}
-	return invoker.Invoke(c)
+	if err := invoker.Invoke(c); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Has checks that type exists in container, if not it return false.
