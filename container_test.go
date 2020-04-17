@@ -383,6 +383,7 @@ func TestContainer_Injectable(t *testing.T) {
 		require.NotNil(t, result.Mux)
 		c.MustEqualPointer(mux, result.Mux)
 	})
+
 	t.Run("container resolve injectable parameter", func(t *testing.T) {
 		c := NewTestContainer(t)
 		type Parameters struct {
@@ -404,6 +405,7 @@ func TestContainer_Injectable(t *testing.T) {
 		c.MustEqualPointer(server, extracted.server)
 		c.MustEqualPointer(file, extracted.file)
 	})
+
 	t.Run("not existing injectable field cause error", func(t *testing.T) {
 		c := NewTestContainer(t)
 		type InjectableType struct {
@@ -414,6 +416,7 @@ func TestContainer_Injectable(t *testing.T) {
 		var result *InjectableType
 		require.EqualError(t, c.Resolve(&result), "*di_test.InjectableType: dependency *http.ServeMux not exists in container")
 	})
+
 	t.Run("not existing and optional field set to nil", func(t *testing.T) {
 		c := NewTestContainer(t)
 		type InjectableType struct {
@@ -425,6 +428,7 @@ func TestContainer_Injectable(t *testing.T) {
 		c.MustResolve(&result)
 		require.Nil(t, result.Mux)
 	})
+
 	t.Run("nested injectable field resolved correctly", func(t *testing.T) {
 		c := NewTestContainer(t)
 		type NestedInjectableType struct {
@@ -501,6 +505,7 @@ func TestContainer_Injectable(t *testing.T) {
 		var result *InjectableType
 		c.MustResolve(&result)
 	})
+
 	t.Run("resolving not provided injectable cause error", func(t *testing.T) {
 		c := NewTestContainer(t)
 		type Parameter struct {
@@ -509,6 +514,21 @@ func TestContainer_Injectable(t *testing.T) {
 		}
 		var p Parameter
 		require.EqualError(t, c.Resolve(&p), "di_test.Parameter: dependency *http.Server not exists in container")
+	})
+
+	t.Run("invoke with di.Inject dependency", func(t *testing.T) {
+		type InjectableParam struct {
+			di.Inject
+
+			Mux *http.ServeMux `di:""`
+		}
+		c := NewTestContainer(t)
+		mux := http.NewServeMux()
+		require.NoError(t, c.Provide(func() *http.ServeMux { return mux }))
+		err := c.Invoke(func(params InjectableParam) {
+			c.MustEqualPointer(mux, params.Mux)
+		})
+		require.NoError(t, err)
 	})
 }
 
