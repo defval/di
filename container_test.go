@@ -81,12 +81,6 @@ func TestContainer_Resolve(t *testing.T) {
 		c.MustEqualPointer(extracted1, extracted2)
 	})
 
-	t.Run("container resolve same pointer for type and interface", func(t *testing.T) {
-		c := NewTestContainer(t)
-		mux := &http.ServeMux{}
-		c.MustProvide(func() *http.ServeMux { return mux })
-	})
-
 	t.Run("resolve not existing type cause error", func(t *testing.T) {
 		c, err := di.New(
 			di.Resolve(&http.Server{}),
