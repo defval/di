@@ -13,8 +13,3 @@ func IsError(typ reflect.Type) bool {
 func IsCleanup(typ reflect.Type) bool {
 	return typ.Kind() == reflect.Func && typ.NumIn() == 0 && typ.NumOut() == 0
 }
-
-// IsPtr checks that value is pointer.
-func IsPtr(value interface{}) bool {
-	return reflect.ValueOf(value).Kind() == reflect.Ptr
-}

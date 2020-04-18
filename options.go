@@ -1,6 +1,8 @@
 package di
 
-import "github.com/goava/di/internal/stacktrace"
+import (
+	"github.com/goava/di/internal/stacktrace"
+)
 
 // Option is a functional option that configures container. If you don't know about functional
 // options, see https://dave.cheney.net/2014/10/17/functional-options-for-friendly-apis.
@@ -18,8 +20,8 @@ type Option interface {
 // add additional behavior to the process of type resolving.
 func Provide(constructor Constructor, options ...ProvideOption) Option {
 	frame := stacktrace.CallerFrame(0)
-	return containerOption(func(c *Container) {
-		c.provides = append(c.provides, provideOptions{
+	return option(func(c *Container) {
+		c.initial.provides = append(c.initial.provides, provideOptions{
 			frame,
 			constructor,
 			options,
@@ -29,25 +31,24 @@ func Provide(constructor Constructor, options ...ProvideOption) Option {
 
 // Constructor is a function with follow signature:
 //
-// 		func NewHTTPServer(addr string, handler http.Handler) (server *http.Server, cleanup func(), err error) {
-//			server := &http.Server{
-//				Addr: addr,
-//			}
-//			cleanup = func() {
-//				server.Close()
-//			}
-//			return server, cleanup, nil
+// 	func NewHTTPServer(addr string, handler http.Handler) (server *http.Server, cleanup func(), err error) {
+// 		server := &http.Server{
+// 			Addr: addr,
 // 		}
+// 		cleanup = func() {
+// 			server.Close()
+// 		}
+// 		return server, cleanup, nil
+// 	}
 //
 // This constructor function teaches container how to build server. Arguments (addr and handler) in this function
 // is a dependencies. They will be resolved automatically when someone needs a server. Constructor may have unlimited
 // count of dependencies, but note that container should know how build each of them.
-// Second result of this function is a optional cleanup closure. It describes what container will do on type destroying.
-// Third result is a optional error. Sometimes our types cannot be constructed :(
+// Second result of this function is a optional cleanup callback. It describes that container will do on shutdown.
+// Third result is a optional error. Sometimes our types cannot be constructed.
 type Constructor interface{}
 
-// ProvideOption is a functional option interface that modify provide behaviour. See di.As(), di.WithName()
-// and di.Prototype().
+// ProvideOption is a functional option interface that modify provide behaviour. See di.As(), di.WithName().
 type ProvideOption interface {
 	apply(params *ProvideParams)
 }
@@ -143,8 +144,8 @@ func Prototype() ProvideOption {
 // after call invokes.
 func Resolve(target interface{}, options ...ResolveOption) Option {
 	frame := stacktrace.CallerFrame(0)
-	return containerOption(func(c *Container) {
-		c.resolves = append(c.resolves, resolveOptions{
+	return option(func(c *Container) {
+		c.initial.resolves = append(c.initial.resolves, resolveOptions{
 			frame,
 			target,
 			options,
@@ -152,12 +153,13 @@ func Resolve(target interface{}, options ...ResolveOption) Option {
 	})
 }
 
-// Invoke returns container option that registers container invocation. All invocations will be called on compile stage
-// after dependency graph resolving.
+// Invoke returns container option that registers container invocation. All invocations
+// will be called on di.New() after processing di.Provide() options.
+// See Container.Invoke() for details.
 func Invoke(fn Invocation, options ...InvokeOption) Option {
 	frame := stacktrace.CallerFrame(0)
-	return containerOption(func(c *Container) {
-		c.invokes = append(c.invokes, invokeOptions{
+	return option(func(c *Container) {
+		c.initial.invokes = append(c.initial.invokes, invokeOptions{
 			frame,
 			fn,
 			options,
@@ -168,11 +170,12 @@ func Invoke(fn Invocation, options ...InvokeOption) Option {
 // Invocation is a function whose signature looks like:
 //
 //		func StartServer(server *http.Server) error {
-//			server.ListenAndServe()
+//			return server.ListenAndServe()
 //		}
 //
-// Like a constructor invocation may have unlimited count of arguments and they will be resolved automatically.
-// Also invocation may return optional error.
+// Like a constructor invocation may have unlimited count of arguments and
+// they will be resolved automatically. The invocation can return an optional error.
+// Error will be returned as is.
 type Invocation interface{}
 
 // Options group together container options.
@@ -193,7 +196,7 @@ type Invocation interface{}
 //     // handle error
 //   }
 func Options(options ...Option) Option {
-	return containerOption(func(container *Container) {
+	return option(func(container *Container) {
 		for _, opt := range options {
 			opt.apply(container)
 		}
@@ -202,19 +205,17 @@ func Options(options ...Option) Option {
 
 // WithLogger sets container logger.
 func WithLogger(logger Logger) Option {
-	return containerOption(func(c *Container) {
+	return option(func(c *Container) {
 		c.logger = logger
 	})
 }
 
-// WithCompile puts the container compilation into a separate function.
+// Deprecated: Compile deprecated: https://github.com/goava/di/pull/9
 func WithCompile() Option {
-	return containerOption(func(c *Container) {
-		c.mcf = true
-	})
+	return option(func(c *Container) {})
 }
 
-// CompileOption is a functional option that change compile behaviour.
+// Deprecated: Compile deprecated: https://github.com/goava/di/pull/9
 type CompileOption interface {
 	apply(c *Container)
 }
@@ -254,7 +255,7 @@ type ResolveOption interface {
 // Name specifies provider string identity. It needed when you have more than one
 // definition of same type. You can identity type by name.
 func Name(name string) ResolveOption {
-	return extractOption(func(params *ResolveParams) {
+	return resolveOption(func(params *ResolveParams) {
 		params.Name = name
 	})
 }
@@ -268,13 +269,9 @@ func (p ResolveParams) apply(params *ResolveParams) {
 	*params = p
 }
 
-type compileOption func(c *Container)
+type option func(c *Container)
 
-func (o compileOption) apply(c *Container) { o(c) }
-
-type containerOption func(c *Container)
-
-func (o containerOption) apply(c *Container) { o(c) }
+func (o option) apply(c *Container) { o(c) }
 
 type provideOption func(params *ProvideParams)
 
@@ -282,8 +279,29 @@ func (o provideOption) apply(params *ProvideParams) {
 	o(params)
 }
 
-type extractOption func(params *ResolveParams)
+type resolveOption func(params *ResolveParams)
 
-func (o extractOption) apply(params *ResolveParams) {
+func (o resolveOption) apply(params *ResolveParams) {
 	o(params)
+}
+
+// struct that contains constructor with options.
+type provideOptions struct {
+	frame       stacktrace.Frame
+	constructor Constructor
+	options     []ProvideOption
+}
+
+// struct that contains invoke function with options.
+type invokeOptions struct {
+	frame   stacktrace.Frame
+	fn      Invocation
+	options []InvokeOption
+}
+
+// struct that container resolve target with options.
+type resolveOptions struct {
+	frame   stacktrace.Frame
+	target  interface{}
+	options []ResolveOption
 }

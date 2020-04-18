@@ -28,7 +28,6 @@ extensible.
   - [Fill struct](https://github.com/goava/di#fill-struct)
   - [Prototypes](https://github.com/goava/di#prototypes)
   - [Cleanup](https://github.com/goava/di#cleanup)
-  - [Compile](https://github.com/goava/di#compile)
 
 ## Documentation
 
@@ -406,7 +405,8 @@ type ServiceParameter struct {
 
 ### Fill struct
 
-To avoid constant constructor changes, you can also use `di.Inject`.
+To avoid constant constructor changes, you can also use `di.Inject`. Note, that supported only
+struct pointers as constructing result.
 
 ```go
 // Controller has some endpoints.
@@ -434,8 +434,6 @@ If you want to create a new instance on each extraction use
 ```go
 di.Provide(NewRequestContext, di.Prototype())
 ```
-
-> todo: real use case
 
 ### Cleanup
 
@@ -471,26 +469,3 @@ if err != nil {
 // do something
 container.Cleanup() // file was closed
 ```
-
-### Compile
-
-With `WithCompile()` container option you can eject compile stage from `New()`.
-
-```go
-container, err := di.New(
-    di.WithCompile(),	
-)
-if err != nil {
-	// handle error
-}
-if err = container.Compile(); err != nil {
-    // handle error
-}
-```
-
-`Compile` compiles the container: parses constructors, builds
-dependency graph, checks that it is acyclic, calls initial invokes and resolves.
-
-> In this case, you can see that container building consists of two stages: `New()` and `Compile()`.
-> This can be useful when you divide the code into several layers and will start control 
-> build flow of application.
