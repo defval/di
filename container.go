@@ -42,6 +42,7 @@ func New(options ...Option) (_ *Container, err error) {
 		values:     map[id]reflect.Value{},
 		prototypes: map[id]bool{},
 		cleanups:   []func(){},
+		verified:   map[id]bool{},
 	}
 	// apply container options
 	for _, opt := range options {
@@ -66,7 +67,7 @@ func New(options ...Option) (_ *Container, err error) {
 		err := c.invoke(invoke.fn, invoke.options...)
 		if err != nil {
 			switch err.(type) {
-			case errParameterProviderNotFound, errParameterProvideFailed:
+			case errParameterProviderNotFound, errParameterProvideFailed, errInvalidInvocation:
 				return nil, ErrInvokeFailed{invoke.frame, err}
 			default:
 				// return error as is if not container error
@@ -104,6 +105,8 @@ type Container struct {
 	prototypes map[id]bool
 	// Array of provider cleanups.
 	cleanups []func()
+	// Flag indicates acyclic verification state
+	verified map[id]bool
 }
 
 // Provide provides to container reliable way to build type. The constructor will be invoked lazily on-demand.
@@ -118,11 +121,11 @@ func (c *Container) Provide(constructor Constructor, options ...ProvideOption) e
 
 func (c *Container) provide(constructor Constructor, options ...ProvideOption) error {
 	if constructor == nil {
-		return provideErrWithStack(fmt.Errorf("invalid constructor signature, got nil"))
+		return fmt.Errorf("invalid constructor signature, got nil")
 	}
 	fn, isFn := reflection.InspectFunc(constructor)
 	if !isFn {
-		return provideErrWithStack(fmt.Errorf("invalid constructor signature, got %s", reflect.TypeOf(constructor)))
+		return fmt.Errorf("invalid constructor signature, got %s", reflect.TypeOf(constructor))
 	}
 	params := ProvideParams{}
 	// apply provide options
@@ -132,22 +135,22 @@ func (c *Container) provide(constructor Constructor, options ...ProvideOption) e
 	// create constructor provider
 	prov, err := newProviderConstructor(params.Name, fn)
 	if err != nil {
-		return provideErrWithStack(err)
+		return err
 	}
 	cleanup := prov.ctorType == ctorCleanup || prov.ctorType == ctorCleanupError
 	if cleanup && params.IsPrototype {
-		return provideErrWithStack(fmt.Errorf("cleanup not supported with prototype providers"))
+		return fmt.Errorf("cleanup not supported with prototype providers")
 	}
 	if _, ok := c.providers[prov.ID()]; ok {
 		// duplicate types not allowed
-		return provideErrWithStack(fmt.Errorf("%s already exists in dependency graph", prov.ID()))
+		return fmt.Errorf("%s already exists in dependency graph", prov.ID())
 	}
 	c.providers[prov.ID()] = prov
 	// save prototype flag
 	c.prototypes[prov.ID()] = params.IsPrototype
 	// process di.As() options and create group of interfaces
 	if err := c.processInterfaces(prov, params.Interfaces); err != nil {
-		return provideErrWithStack(err)
+		return err
 	}
 	return nil
 }
@@ -217,10 +220,17 @@ func (c *Container) resolve(into interface{}, options ...ResolveOption) error {
 	for _, opt := range options {
 		opt.apply(&params)
 	}
-	typ := reflect.TypeOf(into).Elem()
 	param := parameter{
 		name: params.Name,
-		typ:  typ,
+		typ:  reflect.TypeOf(into).Elem(),
+	}
+	// check cycle verified
+	if !c.verified[param.ID()] {
+		err := checkCycles(c, param)
+		if err != nil {
+			return err
+		}
+		c.verified[param.ID()] = true
 	}
 	value, err := param.ResolveValue(c)
 	if err != nil {
@@ -236,7 +246,7 @@ func (c *Container) resolve(into interface{}, options ...ResolveOption) error {
 func (c *Container) Invoke(invocation Invocation, options ...InvokeOption) error {
 	if err := c.invoke(invocation, options...); err != nil {
 		switch err.(type) {
-		case errParameterProviderNotFound, errParameterProvideFailed:
+		case errParameterProviderNotFound, errParameterProvideFailed, errInvalidInvocation:
 			return invokeErrWithStack(err)
 		default:
 			// return error as is
@@ -246,26 +256,46 @@ func (c *Container) Invoke(invocation Invocation, options ...InvokeOption) error
 	return nil
 }
 
-func (c *Container) invoke(invocation Invocation, options ...InvokeOption) error {
+func (c *Container) invoke(invocation Invocation, _ ...InvokeOption) error {
 	// params := InvokeParams{}
 	// for _, opt := range options {
 	// 	opt.apply(&params)
 	// }
 	if invocation == nil {
-		return fmt.Errorf("invalid invocation signature, got %s", "nil")
+		return errInvalidInvocation{fmt.Errorf("invalid invocation signature, got %s", "nil")}
 	}
 	fn, isFn := reflection.InspectFunc(invocation)
 	if !isFn {
-		return fmt.Errorf("invalid invocation signature, got %s", reflect.TypeOf(fn))
+		return errInvalidInvocation{fmt.Errorf("invalid invocation signature, got %s", fn.Type)}
 	}
-	invoker, err := newInvoker(fn)
+	if !validateInvocation(fn) {
+		return errInvalidInvocation{fmt.Errorf("invalid invocation signature, got %s", fn.Type)}
+	}
+	var plist parameterList
+	for j := 0; j < fn.NumIn(); j++ {
+		param := parameter{
+			typ:      fn.In(j),
+			optional: false,
+		}
+		// check cycle verified
+		if !c.verified[param.ID()] {
+			err := checkCycles(c, param)
+			if err != nil {
+				return errInvalidInvocation{err}
+			}
+			c.verified[param.ID()] = true
+		}
+		plist = append(plist, param)
+	}
+	values, err := plist.Resolve(c)
 	if err != nil {
 		return err
 	}
-	if err := invoker.Invoke(c); err != nil {
-		return err
+	results := reflection.CallResult(fn.Call(values))
+	if len(results) == 0 {
+		return nil
 	}
-	return nil
+	return results.Error(0)
 }
 
 // Has checks that type exists in container, if not it return false.
@@ -300,3 +330,6 @@ func (c *Container) Cleanup() {
 		c.cleanups[i]()
 	}
 }
+
+// Deprecated: Compile deprecated: https://github.com/goava/di/pull/9
+func (c *Container) Compile(_ ...CompileOption) error { return nil }

@@ -45,7 +45,6 @@ func TestOptions(t *testing.T) {
 		)
 		require.Nil(t, c)
 		require.NotNil(t, err)
-		fmt.Println(err)
 		require.Contains(t, err.Error(), "options_test.go:")
 		require.Contains(t, err.Error(), ": invalid constructor signature, got func()")
 	})

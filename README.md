@@ -405,7 +405,8 @@ type ServiceParameter struct {
 
 ### Fill struct
 
-To avoid constant constructor changes, you can also use `di.Inject`.
+To avoid constant constructor changes, you can also use `di.Inject`. Note, that supported only
+struct pointers as constructing result.
 
 ```go
 // Controller has some endpoints.

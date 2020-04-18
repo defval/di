@@ -32,6 +32,14 @@ func (p parameter) ResolveProvider(c *Container) (provider, bool) {
 		Type: p.typ,
 	}
 	provider, exists := c.providers[id]
+	if !exists && isInjectable(p.typ) {
+		// constructor result with di.Inject - only addressable pointers
+		// anonymous parameters with di.Inject - only struct
+		if p.typ.Kind() == reflect.Ptr {
+			return nil, false
+		}
+		return providerFromInjectableParameter(p), true
+	}
 	if !exists {
 		return nil, false
 	}
@@ -45,10 +53,6 @@ func (p parameter) ResolveValue(c *Container) (reflect.Value, error) {
 		return existing, nil
 	}
 	provider, exists := p.ResolveProvider(c)
-	if !exists && isInjectable(p.typ) {
-		exists = true
-		provider = providerFromInjectableParameter(p)
-	}
 	if !exists && p.optional {
 		return reflect.New(p.typ).Elem(), nil
 	}

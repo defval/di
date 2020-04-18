@@ -49,6 +49,11 @@ func newProviderConstructor(name string, fn reflection.Func) (*providerConstruct
 	}
 	// result type
 	rt := fn.Out(0)
+	// constructor result with di.Inject - only addressable pointers
+	// anonymous parameters with di.Inject - only struct
+	if isInjectable(rt) && rt.Kind() != reflect.Ptr {
+		return nil, fmt.Errorf("di.Inject not supported for unaddressable result of constructor, use *%s instead", rt)
+	}
 	// if struct is injectable, range over injectableFields and parse injectable params
 	if isInjectable(rt) {
 		provider.injectable.params, provider.injectable.fields = parseInjectableType(rt)
@@ -86,16 +91,16 @@ func (c *providerConstructor) Provide(values ...reflect.Value) (reflect.Value, f
 		clpi = 0
 	}
 	out := reflection.CallResult(c.call.Call(values[:clpi]))
+	rv := out.Result()
 	if c.ctorType == ctorError && out.Error(1) != nil {
-		return out.Result(), nil, out.Error(1)
+		return rv, nil, out.Error(1)
 	}
 	if c.ctorType == ctorCleanupError && out.Error(2) != nil {
-		return out.Result(), nil, out.Error(2)
+		return rv, nil, out.Error(2)
 	}
 	// set injectable fields
 	if len(c.injectable.fields) > 0 {
 		// result value
-		rv := out.Result()
 		if rv.Kind() == reflect.Ptr {
 			rv = rv.Elem()
 		}
@@ -104,9 +109,6 @@ func (c *providerConstructor) Provide(values ...reflect.Value) (reflect.Value, f
 		for i, value := range fields {
 			// field value
 			fv := rv.Field(c.injectable.fields[i])
-			if !fv.CanSet() {
-				panic("you found a bug, please create new issue for this: https://github.com/goava/di/issues/new")
-			}
 			fv.Set(value)
 		}
 	}

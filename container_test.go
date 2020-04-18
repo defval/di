@@ -39,7 +39,7 @@ func TestContainer_Resolve(t *testing.T) {
 		require.Contains(t, err.Error(), ": resolve target must be a pointer, got string")
 	})
 
-	t.Run("resolve returns error because dependency not exists", func(t *testing.T) {
+	t.Run("dependency not exists", func(t *testing.T) {
 		c := NewTestContainer(t)
 		c.MustProvide(func(int) int32 { return 0 })
 		var i int32
@@ -49,7 +49,7 @@ func TestContainer_Resolve(t *testing.T) {
 		require.Contains(t, err.Error(), ": int32: dependency int not exists in container")
 	})
 
-	t.Run("resolve returns error because dependency constructing failed", func(t *testing.T) {
+	t.Run("dependency constructing failed", func(t *testing.T) {
 		c := NewTestContainer(t)
 		c.MustProvide(func() (*http.Server, error) {
 			return &http.Server{}, fmt.Errorf("server build failed")
@@ -79,7 +79,7 @@ func TestContainer_Resolve(t *testing.T) {
 		c.MustResolvePtr(server, &extracted2)
 	})
 
-	t.Run("incorrect resolve cause error", func(t *testing.T) {
+	t.Run("resolve not existing type cause error", func(t *testing.T) {
 		c, err := di.New(
 			di.Resolve(&http.Server{}),
 		)
@@ -96,6 +96,22 @@ func TestContainer_Resolve(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.Equal(t, fmt.Sprintf("%p", c), fmt.Sprintf("%p", resolved))
+	})
+
+	t.Run("cycle cause error", func(t *testing.T) {
+		c := NewTestContainer(t)
+		// bool -> int32 -> int64 -> bool
+		err := c.Provide(func(int32) bool { return true })
+		require.NoError(t, err)
+		err = c.Provide(func(int64) int32 { return 0 })
+		require.NoError(t, err)
+		err = c.Provide(func(bool) int64 { return 0 })
+		require.NoError(t, err)
+		var b bool
+		err = c.Resolve(&b)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "container_test.go:")
+		require.Contains(t, err.Error(), ": cycle detected") // todo: improve message
 	})
 }
 
@@ -117,7 +133,7 @@ func TestContainer_Resolve_Name(t *testing.T) {
 }
 
 func TestContainer_Resolve_Interface(t *testing.T) {
-	t.Run("resolve interface with multiple implementations cause error", func(t *testing.T) {
+	t.Run("resolve interface with several implementations cause error", func(t *testing.T) {
 		c := NewTestContainer(t)
 		c.MustProvide(func() *http.Server { return &http.Server{} }, new(io.Closer))
 		c.MustProvide(func() *os.File { return &os.File{} }, new(io.Closer))
@@ -185,7 +201,9 @@ func TestContainer_Group(t *testing.T) {
 	t.Run("incorrect signature", func(t *testing.T) {
 		c := NewTestContainer(t)
 		err := c.Invoke(func() *http.Server { return &http.Server{} })
-		require.EqualError(t, err, "invoke function must be a function like `func([dep1, dep2, ...]) [error]`, got func() *http.Server")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "container_test.go:")
+		require.Contains(t, err.Error(), ": invalid invocation signature, got func() *http.Server")
 	})
 }
 
@@ -211,32 +229,38 @@ func TestContainer_Invoke(t *testing.T) {
 	t.Run("resolve dependencies in invoke", func(t *testing.T) {
 		c := NewTestContainer(t)
 		server := &http.Server{}
+		called := false
 		c.MustProvide(func() *http.Server { return server })
 		c.MustInvoke(func(in *http.Server) {
+			called = true
 			c.MustEqualPointer(server, in)
 		})
+		require.True(t, called)
 	})
 
-	t.Run("invoke return correct error", func(t *testing.T) {
+	t.Run("invoke return error as is", func(t *testing.T) {
 		c := NewTestContainer(t)
 		err := c.Invoke(func() error { return fmt.Errorf("invoke error") })
 		require.EqualError(t, err, "invoke error")
 	})
+
+	t.Run("cycle cause error", func(t *testing.T) {
+		c := NewTestContainer(t)
+		// bool -> int32 -> int64 -> bool
+		err := c.Provide(func(int32) bool { return true })
+		require.NoError(t, err)
+		err = c.Provide(func(int64) int32 { return 0 })
+		require.NoError(t, err)
+		err = c.Provide(func(bool) int64 { return 0 })
+		require.NoError(t, err)
+		err = c.Invoke(func(bool) {})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "container_test.go:")
+		require.Contains(t, err.Error(), ": cycle detected") // todo: improve message
+	})
 }
 
 func TestContainer_Provide(t *testing.T) {
-	// t.Run("cycle cause error", func(t *testing.T) {
-	// 	c := NewTestContainer(t)
-	// 	// bool -> int32 -> int64 -> bool
-	// 	err := c.Provide(func(int32) bool { return true })
-	// 	require.NoError(t, err)
-	// 	err = c.Provide(func(int64) int32 { return 0 })
-	// 	require.NoError(t, err)
-	// 	err = c.Provide(func(bool) int64 { return 0 })
-	// 	require.EqualError(t, err, "")
-	// 	require.NotNil(t, err)
-	// })
-
 	t.Run("simple constructor", func(t *testing.T) {
 		c := NewTestContainer(t)
 		c.MustProvide(func() *http.Server { return &http.Server{} })
@@ -405,7 +429,7 @@ func TestContainer_ConstructorResolve(t *testing.T) {
 }
 
 func TestContainer_Injectable(t *testing.T) {
-	t.Run("constructor with injectable", func(t *testing.T) {
+	t.Run("constructor with injectable pointer", func(t *testing.T) {
 		c := NewTestContainer(t)
 		type InjectableType struct {
 			di.Inject
@@ -418,6 +442,20 @@ func TestContainer_Injectable(t *testing.T) {
 		c.MustResolve(&result)
 		require.NotNil(t, result.Mux)
 		c.MustEqualPointer(mux, result.Mux)
+	})
+
+	t.Run("provide injectable struct cause error", func(t *testing.T) {
+		c := NewTestContainer(t)
+		type InjectableType struct {
+			di.Inject
+			Mux *http.ServeMux `di:""`
+		}
+		mux := &http.ServeMux{}
+		c.MustProvide(func() *http.ServeMux { return mux })
+		err := c.Provide(func() InjectableType { return InjectableType{} })
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "container_test.go:")
+		require.Contains(t, err.Error(), ": di.Inject not supported for unaddressable result of constructor, use *di_test.InjectableType instead")
 	})
 
 	t.Run("container resolve injectable parameter", func(t *testing.T) {
@@ -464,6 +502,7 @@ func TestContainer_Injectable(t *testing.T) {
 		}
 		c.MustProvide(func() *InjectableType { return &InjectableType{} })
 		var result *InjectableType
+		fmt.Println(c.Resolve(&result))
 		c.MustResolve(&result)
 		require.Nil(t, result.Mux)
 	})
@@ -558,10 +597,9 @@ func TestContainer_Injectable(t *testing.T) {
 		require.Contains(t, err.Error(), ": di_test.Parameter: dependency *http.Server not exists in container")
 	})
 
-	t.Run("invoke with di.Inject dependency", func(t *testing.T) {
+	t.Run("invoke with inject dependency struct", func(t *testing.T) {
 		type InjectableParam struct {
 			di.Inject
-
 			Mux *http.ServeMux `di:""`
 		}
 		c := NewTestContainer(t)
@@ -571,6 +609,20 @@ func TestContainer_Injectable(t *testing.T) {
 			c.MustEqualPointer(mux, params.Mux)
 		})
 		require.NoError(t, err)
+	})
+
+	t.Run("invoke with inject dependency pointer", func(t *testing.T) {
+		type InjectableParam struct {
+			di.Inject
+			Mux *http.ServeMux `di:""`
+		}
+		c := NewTestContainer(t)
+		mux := http.NewServeMux()
+		require.NoError(t, c.Provide(func() *http.ServeMux { return mux }))
+		err := c.Invoke(func(params *InjectableParam) {})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "container_test.go:")
+		require.Contains(t, err.Error(), ": type *di_test.InjectableParam not exists in container")
 	})
 }
 

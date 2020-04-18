@@ -210,14 +210,12 @@ func WithLogger(logger Logger) Option {
 	})
 }
 
-// Deprecated: Compile deprecated
+// Deprecated: Compile deprecated: https://github.com/goava/di/pull/9
 func WithCompile() Option {
-	return option(func(c *Container) {
-		// c.mcf = true
-	})
+	return option(func(c *Container) {})
 }
 
-// Deprecated: Compile deprecated
+// Deprecated: Compile deprecated: https://github.com/goava/di/pull/9
 type CompileOption interface {
 	apply(c *Container)
 }
