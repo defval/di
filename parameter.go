@@ -48,7 +48,7 @@ func (p parameter) ResolveProvider(c *Container) (provider, bool) {
 
 // ResolveValue resolves value in container c.
 func (p parameter) ResolveValue(c *Container) (reflect.Value, error) {
-	_, prototype := c.prototypes[p.ID()]
+	prototype := c.prototypes[p.ID()]
 	if existing, ok := c.values[p.ID()]; ok && !prototype {
 		return existing, nil
 	}

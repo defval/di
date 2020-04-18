@@ -2,7 +2,6 @@ package di_test
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"testing"
 
@@ -55,7 +54,6 @@ func TestOptions(t *testing.T) {
 		)
 		require.Nil(t, c)
 		require.Error(t, err)
-		fmt.Println(err)
 		require.Contains(t, err.Error(), "options_test.go:")
 		require.Contains(t, err.Error(), ": type string not exists in container")
 	})

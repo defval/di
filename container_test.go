@@ -71,12 +71,20 @@ func TestContainer_Resolve(t *testing.T) {
 
 	t.Run("container resolve same pointer on each resolve", func(t *testing.T) {
 		c := NewTestContainer(t)
-		server := &http.Server{}
-		c.MustProvide(func() *http.Server { return server })
+		c.MustProvide(func() *http.Server {
+			return &http.Server{}
+		})
 		var extracted1 *http.Server
-		c.MustResolvePtr(server, &extracted1)
+		c.MustResolve(&extracted1)
 		var extracted2 *http.Server
-		c.MustResolvePtr(server, &extracted2)
+		c.MustResolve(&extracted2)
+		c.MustEqualPointer(extracted1, extracted2)
+	})
+
+	t.Run("container resolve same pointer for type and interface", func(t *testing.T) {
+		c := NewTestContainer(t)
+		mux := &http.ServeMux{}
+		c.MustProvide(func() *http.ServeMux { return mux })
 	})
 
 	t.Run("resolve not existing type cause error", func(t *testing.T) {
@@ -362,7 +370,6 @@ func TestContainer_Provide(t *testing.T) {
 		c := NewTestContainer(t)
 		err := c.Provide(func() *http.Server { return nil }, di.As(&http.Server{}))
 		require.Error(t, err)
-		fmt.Println(err)
 		require.Contains(t, err.Error(), "container_test.go:")
 		require.Contains(t, err.Error(), ": *http.Server: not a pointer to interface")
 	})
