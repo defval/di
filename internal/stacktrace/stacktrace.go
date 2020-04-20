@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// CallerFrame
+// CallerFrame returns stacktrace call frame with skip.
 func CallerFrame(skip int) (frame Frame) {
 	pc, file, line, ok := runtime.Caller(skip + 2)
 	if !ok {
@@ -23,14 +23,14 @@ func CallerFrame(skip int) (frame Frame) {
 	}
 }
 
-// Frame
+// Frame represents stacktrace frame.
 type Frame struct {
 	function string
 	file     string
 	line     int
 }
 
-// Format
+// Format formats stacktrace frame.
 func (f Frame) Format(s fmt.State, c rune) {
 	_, _ = fmt.Fprintf(s, "%s:%d", f.file, f.line)
 }

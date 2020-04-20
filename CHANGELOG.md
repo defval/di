@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!--## [Unrealeased]-->
 
+## v1.2.0
+
+### Added
+
+- Any type can be automatically resolved as a group.
+- The container exposes itself by default.
+- The only named type in the group will be resolved without a name.
+- Dependency graph can be edited in the runtime (but you need to be careful with this).
+
 ## v1.1.0
 
 ### BREAKING CHANGES

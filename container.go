@@ -321,5 +321,6 @@ func (c *Container) Cleanup() {
 	}
 }
 
+// Compile compiles the container.
 // Deprecated: Compile deprecated: https://github.com/goava/di/pull/9
 func (c *Container) Compile(_ ...CompileOption) error { return nil }
