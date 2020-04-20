@@ -20,12 +20,12 @@ type Container struct {
 		// Array of di.Resolve() options.
 		resolves []resolveOptions
 	}
-	// Mapping from id to provider that can provide value for that id.
+	// Mapping from key to provider that can provide value for that key.
 	providers map[reflect.Type]*providerList
 	// Array of provider cleanups.
 	cleanups []func()
 	// Flag indicates acyclic verification state
-	verified map[id]bool
+	verified map[key]bool
 }
 
 // New constructs container with provided options. Example usage (simplified):
@@ -61,7 +61,7 @@ func New(options ...Option) (_ *Container, err error) {
 		logger:    nopLogger{},
 		providers: map[reflect.Type]*providerList{},
 		cleanups:  []func(){},
-		verified:  map[id]bool{},
+		verified:  map[key]bool{},
 	}
 	// apply container options
 	for _, opt := range options {
@@ -142,20 +142,22 @@ func (c *Container) provide(constructor Constructor, options ...ProvideOption) e
 	if !params.IsPrototype {
 		fp = asSingleton(p)
 	}
-	if err := plist.Add(fp); err != nil {
+	uniq, err := plist.Add(fp)
+	if err != nil {
 		return err
 	}
-	if err := c.processInterfaces(fp, params.Interfaces, params.IsPrototype); err != nil {
+	link := keyUniq{key{fp.Type(), fp.Name()}, uniq}
+	if err := c.processInterfaces(link, params.Interfaces, params.IsPrototype); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *Container) processInterfaces(p provider, interfaces []Interface, isPrototype bool) error {
+func (c *Container) processInterfaces(key keyUniq, interfaces []Interface, isPrototype bool) error {
 	// interface raw
 	for _, iraw := range interfaces {
 		// provider interface
-		piface, err := newProviderInterface(p, iraw)
+		piface, err := newProviderInterface(key.uniq, key.key, iraw)
 		if err != nil {
 			return err
 		}
@@ -170,7 +172,8 @@ func (c *Container) processInterfaces(p provider, interfaces []Interface, isProt
 		if !isPrototype {
 			fpiface = asSingleton(piface)
 		}
-		if err := ilist.Add(fpiface); err != nil {
+		_, err = ilist.Add(fpiface)
+		if err != nil {
 			return err
 		}
 	}

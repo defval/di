@@ -11,7 +11,7 @@ const (
 
 // used depth-first topological sort algorithm
 func checkCycles(c *Container, param parameter) error {
-	var marks = map[id]int{}
+	var marks = map[key]int{}
 	provider, err := param.ResolveProvider(c)
 	if err != nil {
 		return err
@@ -22,8 +22,8 @@ func checkCycles(c *Container, param parameter) error {
 	return nil
 }
 
-func visit(c *Container, provider provider, marks map[id]int) error {
-	pid := id{provider.Type(), provider.Name()}
+func visit(c *Container, provider provider, marks map[key]int) error {
+	pid := key{provider.Type(), provider.Name()}
 	if marks[pid] == permanent {
 		return nil
 	}

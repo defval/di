@@ -8,7 +8,7 @@ import (
 )
 
 func TestId_String(t *testing.T) {
-	i := id{
+	i := key{
 		Type: reflect.TypeOf(int(0)),
 	}
 	require.Equal(t, "int", i.String())

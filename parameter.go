@@ -7,15 +7,15 @@ import (
 
 // parameterRequired
 type parameter struct {
-	uniq     string       // internal uniq id
+	uniq     string       // internal uniq key
 	typ      reflect.Type // resultant type
 	name     string       // string identifier
 	optional bool         // optional flag
 }
 
 // ID returns parameter identity.
-func (p parameter) ID() id {
-	return id{p.typ, p.name}
+func (p parameter) ID() key {
+	return key{p.typ, p.name}
 }
 
 // String represents parameter as string.

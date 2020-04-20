@@ -34,18 +34,21 @@ type providerList struct {
 	providers map[string]provider
 }
 
-func (l *providerList) Add(p provider) error {
+// Add adds provider to list and return uniq identifier. If named provider already
+// exists in list returns error.
+func (l *providerList) Add(p provider) (string, error) {
 	for _, prov := range l.providers {
 		if p.Name() != "" && p.Name() == prov.Name() {
-			return fmt.Errorf("%s with name %s already exists, use another name", p.Type(), p.Name())
+			return "", fmt.Errorf("%s with name %s already exists, use another name", p.Type(), p.Name())
 		}
 	}
 	uniq := randomString(32)
 	l.order = append(l.order, uniq)
 	l.providers[uniq] = p
-	return nil
+	return uniq, nil
 }
 
+// All return all providers as is.
 func (l providerList) All() (result []provider) {
 	for _, uniq := range l.order {
 		result = append(result, l.providers[uniq])
@@ -53,6 +56,7 @@ func (l providerList) All() (result []provider) {
 	return result
 }
 
+// Uniqs returns all providers with uniq.
 func (l providerList) Uniqs() (result []uniqueProvider) {
 	for _, uniq := range l.order {
 		result = append(result, uniqueProvider{

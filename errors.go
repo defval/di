@@ -94,8 +94,8 @@ func (e errParameterProviderNotFound) Error() string {
 }
 
 type errDependencyNotFound struct {
-	dependant id
-	parameter id
+	dependant key
+	parameter key
 }
 
 func (e errDependencyNotFound) Error() string {

@@ -162,6 +162,21 @@ func TestContainer_Resolve_GroupOfTypes(t *testing.T) {
 		require.Contains(t, err.Error(), "container_test.go:")
 		require.Contains(t, err.Error(), ": *net.TCPConn: could not be resolved: have several instances")
 	})
+
+	t.Run("resolve group of interface", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		server := &http.Server{}
+		file := &os.File{}
+		require.NoError(t, c.Provide(func() *http.Server { return server }, di.As(new(io.Closer))))
+		require.NoError(t, c.Provide(func() *os.File { return file }, di.As(new(io.Closer))))
+		var closers []io.Closer
+		require.NoError(t, c.Resolve(&closers))
+		require.Len(t, closers, 2)
+		require.Equal(t, fmt.Sprintf("%p", server), fmt.Sprintf("%p", closers[0]))
+		require.Equal(t, fmt.Sprintf("%p", file), fmt.Sprintf("%p", closers[1]))
+	})
 }
 
 func TestContainer_Resolve_Name(t *testing.T) {
@@ -287,6 +302,20 @@ func TestContainer_Resolve_Interface(t *testing.T) {
 		require.NoError(t, c.Resolve(&funcs))
 		require.Len(t, funcs, 3)
 	})
+
+	t.Run("resolve one interface from group of type", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		conn1 := &net.TCPConn{}
+		conn2 := &net.TCPConn{}
+		require.NoError(t, c.Provide(func() *net.TCPConn { return conn1 }))
+		require.NoError(t, c.Provide(func() *net.TCPConn { return conn2 }, di.As(new(net.Conn))))
+		var conn net.Conn
+		require.NoError(t, c.Resolve(&conn))
+		require.Equal(t, fmt.Sprintf("%p", conn), fmt.Sprintf("%p", conn))
+
+	})
 }
 
 func TestContainer_Prototype(t *testing.T) {
@@ -314,19 +343,6 @@ func TestContainer_Prototype(t *testing.T) {
 }
 
 func TestContainer_Group(t *testing.T) {
-	t.Run("create group and resolve it", func(t *testing.T) {
-		c := NewTestContainer(t)
-		server := &http.Server{}
-		file := &os.File{}
-		c.MustProvide(func() *http.Server { return server }, new(io.Closer))
-		c.MustProvide(func() *os.File { return file }, new(io.Closer))
-		var group []io.Closer
-		c.MustResolve(&group)
-		require.Len(t, group, 2)
-		c.MustEqualPointer(server, group[0])
-		c.MustEqualPointer(file, group[1])
-	})
-
 	t.Run("resolve group argument", func(t *testing.T) {
 		c := NewTestContainer(t)
 		server := &http.Server{}
