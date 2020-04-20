@@ -28,6 +28,7 @@ extensible.
   - [Fill struct](https://github.com/goava/di#fill-struct)
   - [Prototypes](https://github.com/goava/di#prototypes)
   - [Cleanup](https://github.com/goava/di#cleanup)
+- [Comparison](https://github.com/goava/di#comparison)
 
 ## Documentation
 
@@ -48,7 +49,7 @@ go get github.com/goava/di
 Let's learn to use di by example. We will code a simple application
 that processes HTTP requests.
 
-The full tutorial code is available [here](./_tutorial/main.go)
+The full tutorial code is available [here](./_examples/tutorial/main.go)
 
 ### Provide
 
@@ -156,7 +157,7 @@ the container it will not be constructed.
 
 ### Interfaces
 
-Inject make possible to provide implementation as an interface.
+Container make possible to provide implementation as an interface.
 
 ```go
 // NewServer creates a http server with provided mux as handler.
@@ -193,9 +194,8 @@ constructor. Using interfaces contributes to writing more testable code.
 
 ### Groups
 
-Container automatically groups all implementations of interface to
-`[]<interface>` group. For example, provide with
-`di.As(new(http.Handler)` automatically creates a group
+Container automatically groups same types to `[]<type>` slice. It works with `di.As()`.
+For example, provide with `di.As(new(http.Handler)` automatically creates a group
 `[]http.Handler`.
 
 Let's add some http controllers using this feature. Controllers have
@@ -286,7 +286,7 @@ func NewServeMux(controllers []Controller) *http.ServeMux {
 }
 ```
 
-The full tutorial code is available [here](./_tutorial/main.go)
+The full tutorial code is available [here](./_examples/tutorial/main.go)
 
 ## Advanced features
 
@@ -469,3 +469,16 @@ if err != nil {
 // do something
 container.Cleanup() // file was closed
 ```
+
+## Comparison
+
+|                               | **goava/di** | google/wire | uber-go/dig | sarulabs/di |
+|-------------------------------|     :---:    |    :---:    |    :---:    |    :---:    |
+| **Autowiring**                |     ➕       |      ➕      |      ➕     |      ➖     |
+| **Type groups**               |     ➕       |      ➖      |  Struct tag |     Tag     |
+| **Interface binding**         |     ➕       |      ➕      |      ➖     |      ➖      |
+| **Named definitions**         |     ➕       |      ➖      |      ➕     |      ➕      |
+| **Functional options API**    |     ➕       |      ➖      |      ➖     |      ➖      |
+| **Optional dependencies**     |     ➕       |      ➖      |      ➕     |              |
+| **Cleanup**                   |     ➕       |      ➕      |      ➖     |      ➕      |
+| Reflection based              |     ➕       |      ➖      |      ➕     |      ➕      |

@@ -210,11 +210,13 @@ func WithLogger(logger Logger) Option {
 	})
 }
 
+// WithCompile ejects compile stage.
 // Deprecated: Compile deprecated: https://github.com/goava/di/pull/9
 func WithCompile() Option {
 	return option(func(c *Container) {})
 }
 
+// CompileOption modifies compile behaviour.
 // Deprecated: Compile deprecated: https://github.com/goava/di/pull/9
 type CompileOption interface {
 	apply(c *Container)
