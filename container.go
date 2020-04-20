@@ -210,12 +210,12 @@ func (c *Container) resolve(into interface{}, options ...ResolveOption) error {
 		typ:  reflect.TypeOf(into).Elem(),
 	}
 	// check cycle verified
-	if !c.verified[param.ID()] {
+	if !c.verified[param.Key()] {
 		err := checkCycles(c, param)
 		if err != nil {
 			return err
 		}
-		c.verified[param.ID()] = true
+		c.verified[param.Key()] = true
 	}
 	value, err := param.ResolveValue(c)
 	if err != nil {
@@ -261,12 +261,12 @@ func (c *Container) invoke(invocation Invocation, _ ...InvokeOption) error {
 			optional: false,
 		}
 		// check cycle verified
-		if !c.verified[param.ID()] {
+		if !c.verified[param.Key()] {
 			err := checkCycles(c, param)
 			if err != nil {
 				return errInvalidInvocation{err}
 			}
-			c.verified[param.ID()] = true
+			c.verified[param.Key()] = true
 		}
 		plist = append(plist, param)
 	}

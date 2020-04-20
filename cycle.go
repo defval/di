@@ -39,7 +39,7 @@ func visit(c *Container, provider provider, marks map[key]int) error {
 		if err != nil {
 			switch err.(type) {
 			case errParameterProviderNotFound:
-				return errDependencyNotFound{pid, param.ID()}
+				return errDependencyNotFound{pid, param.Key()}
 			default:
 				return err
 			}

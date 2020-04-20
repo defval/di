@@ -7,20 +7,20 @@ import (
 
 // parameterRequired
 type parameter struct {
-	uniq     string       // internal uniq key
+	uniq     string       // internal uniq key, optional
 	typ      reflect.Type // resultant type
 	name     string       // string identifier
 	optional bool         // optional flag
 }
 
-// ID returns parameter identity.
-func (p parameter) ID() key {
+// Key returns parameter identity.
+func (p parameter) Key() key {
 	return key{p.typ, p.name}
 }
 
 // String represents parameter as string.
 func (p parameter) String() string {
-	return p.ID().String()
+	return p.Key().String()
 }
 
 // ResolveProvider resolves type in container c.
@@ -83,7 +83,7 @@ func (p parameter) ResolveValue(c *Container) (reflect.Value, error) {
 	if err != nil {
 		switch cerr := err.(type) {
 		case errParameterProviderNotFound:
-			return reflect.Value{}, errDependencyNotFound{p.ID(), cerr.param.ID()}
+			return reflect.Value{}, errDependencyNotFound{p.Key(), cerr.param.Key()}
 		default:
 			return reflect.Value{}, fmt.Errorf("%s: %s", p, err)
 		}
