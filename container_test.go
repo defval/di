@@ -16,40 +16,36 @@ import (
 
 func TestContainer_Resolve(t *testing.T) {
 	t.Run("resolve into nil cause error", func(t *testing.T) {
-		c := NewTestContainer(t)
-		err := c.Resolve(nil)
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		err = c.Resolve(nil)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "container_test.go:")
 		require.Contains(t, err.Error(), ": resolve target must be a pointer, got nil")
 	})
 
 	t.Run("resolve into struct cause error", func(t *testing.T) {
-		c := NewTestContainer(t)
-		err := c.Resolve(struct{}{})
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		err = c.Resolve(struct{}{})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "container_test.go:")
 		require.Contains(t, err.Error(), ": resolve target must be a pointer, got struct {}")
 	})
 
 	t.Run("resolve into string cause error", func(t *testing.T) {
-		c := NewTestContainer(t)
-		err := c.Resolve("string")
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		err = c.Resolve("string")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "container_test.go:")
 		require.Contains(t, err.Error(), ": resolve target must be a pointer, got string")
 	})
 
-	t.Run("dependency not exists", func(t *testing.T) {
-		c := NewTestContainer(t)
-		c.MustProvide(func(int) int32 { return 0 })
-		var i int32
-		err := c.Resolve(&i)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "container_test.go:")
-		require.Contains(t, err.Error(), ": int32: dependency int not exists in container")
-	})
-
-	t.Run("dependency constructing failed", func(t *testing.T) {
+	t.Run("resolve parameter constructing failed", func(t *testing.T) {
 		c := NewTestContainer(t)
 		c.MustProvide(func() (*http.Server, error) {
 			return &http.Server{}, fmt.Errorf("server build failed")
@@ -61,43 +57,48 @@ func TestContainer_Resolve(t *testing.T) {
 		require.Contains(t, err.Error(), ": *http.Server: server build failed")
 	})
 
-	t.Run("container resolve correct pointer", func(t *testing.T) {
-		c := NewTestContainer(t)
+	t.Run("resolve returns type that was created in constructor", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
 		server := &http.Server{}
-		c.MustProvide(func() *http.Server { return server })
+		require.NoError(t, c.Provide(func() *http.Server { return server }))
 		var extracted *http.Server
-		c.MustResolvePtr(server, &extracted)
+		require.NoError(t, c.Resolve(&extracted))
+		require.Equal(t, fmt.Sprintf("%p", server), fmt.Sprintf("%p", extracted))
 	})
 
-	t.Run("container resolve same pointer on each resolve", func(t *testing.T) {
-		c := NewTestContainer(t)
-		c.MustProvide(func() *http.Server {
+	t.Run("resolve same pointer on each resolve", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		require.NoError(t, c.Provide(func() *http.Server {
 			return &http.Server{}
-		})
-		var extracted1 *http.Server
-		c.MustResolve(&extracted1)
-		var extracted2 *http.Server
-		c.MustResolve(&extracted2)
-		c.MustEqualPointer(extracted1, extracted2)
+		}))
+		var server1 *http.Server
+		require.NoError(t, c.Resolve(&server1))
+		var server2 *http.Server
+		require.NoError(t, c.Resolve(&server2))
+		require.Equal(t, fmt.Sprintf("%p", server1), fmt.Sprintf("%p", server2))
 	})
 
 	t.Run("resolve not existing type cause error", func(t *testing.T) {
-		c, err := di.New(
-			di.Resolve(&http.Server{}),
-		)
-		require.Nil(t, c)
+		c, err := di.New()
+		require.NotNil(t, c)
+		require.NoError(t, err)
+		err = c.Resolve(&http.Server{})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "container_test.go:")
 		require.Contains(t, err.Error(), ": type http.Server not exists in container")
 	})
 
-	t.Run("container resolve", func(t *testing.T) {
-		var resolved *di.Container
-		c, err := di.New(
-			di.Resolve(&resolved),
-		)
+	t.Run("container provided by default", func(t *testing.T) {
+		var container *di.Container
+		c, err := di.New()
 		require.NoError(t, err)
-		require.Equal(t, fmt.Sprintf("%p", c), fmt.Sprintf("%p", resolved))
+		require.NotNil(t, c)
+		require.NoError(t, c.Resolve(&container))
+		require.Equal(t, fmt.Sprintf("%p", c), fmt.Sprintf("%p", container))
 	})
 
 	t.Run("cycle cause error", func(t *testing.T) {
@@ -117,20 +118,107 @@ func TestContainer_Resolve(t *testing.T) {
 	})
 }
 
+func TestContainer_Resolve_ConstructorDependency(t *testing.T) {
+	t.Run("resolve not existing type cause error", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		require.NoError(t, c.Provide(func(int) int32 { return 0 }))
+		var i int32
+		err = c.Resolve(&i)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "container_test.go:")
+		require.Contains(t, err.Error(), ": int32: dependency int not exists in container")
+	})
+}
+
+func TestContainer_Resolve_GroupOfTypes(t *testing.T) {
+	t.Run("resolve multiple type instances as slice of type", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		conn1 := &net.TCPConn{}
+		conn2 := &net.TCPConn{}
+		require.NoError(t, c.Provide(func() *net.TCPConn { return conn1 }))
+		require.NoError(t, c.Provide(func() *net.TCPConn { return conn2 }))
+		var conns []*net.TCPConn
+		require.NoError(t, c.Resolve(&conns))
+		require.Len(t, conns, 2)
+		require.Equal(t, fmt.Sprintf("%p", conn1), fmt.Sprintf("%p", conns[0]))
+		require.Equal(t, fmt.Sprintf("%p", conn2), fmt.Sprintf("%p", conns[1]))
+	})
+
+	t.Run("resolve net specific type of group cause error", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		conn1 := &net.TCPConn{}
+		conn2 := &net.TCPConn{}
+		require.NoError(t, c.Provide(func() *net.TCPConn { return conn1 }))
+		require.NoError(t, c.Provide(func() *net.TCPConn { return conn2 }))
+		var conn *net.TCPConn
+		err = c.Resolve(&conn)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "container_test.go:")
+		require.Contains(t, err.Error(), ": *net.TCPConn: could not be resolved: have several instances")
+	})
+}
+
 func TestContainer_Resolve_Name(t *testing.T) {
 	t.Run("resolve named definition", func(t *testing.T) {
 		c := NewTestContainer(t)
-		foo := &http.Server{}
-		err := c.Provide(func() *http.Server { return foo }, di.WithName("server"))
+		first := &http.Server{}
+		second := &http.Server{}
+		err := c.Provide(func() *http.Server { return first }, di.WithName("first"))
 		require.NoError(t, err)
+		err = c.Provide(func() *http.Server { return second }, di.WithName("second"))
 		var extracted *http.Server
 		err = c.Resolve(&extracted)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "container_test.go:")
-		require.Contains(t, err.Error(), ": type *http.Server not exists in container")
-		err = c.Resolve(&extracted, di.Name("server"))
+		require.Contains(t, err.Error(), ": *http.Server: could not be resolved: have several instances")
+		err = c.Resolve(&extracted, di.Name("first"))
 		require.NoError(t, err)
-		c.MustEqualPointer(foo, extracted)
+		c.MustEqualPointer(first, extracted)
+		err = c.Resolve(&extracted, di.Name("second"))
+		require.NoError(t, err)
+		c.MustEqualPointer(second, extracted)
+	})
+
+	t.Run("resolve single named definition as type", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		require.NoError(t, c.Provide(http.NewServeMux, di.WithName("first")))
+		var mux *http.ServeMux
+		require.NoError(t, c.Resolve(&mux))
+		require.NoError(t, c.Provide(http.NewServeMux, di.WithName("second")))
+		err = c.Resolve(&mux)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "container_test.go:")
+		require.Contains(t, err.Error(), ": *http.ServeMux: could not be resolved: have several instances")
+	})
+
+	t.Run("named provider not found", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		require.NoError(t, c.Provide(http.NewServeMux, di.WithName("first")))
+		require.NoError(t, c.Provide(http.NewServeMux, di.WithName("second")))
+		var mux *http.ServeMux
+		err = c.Resolve(&mux, di.Name("unknown"))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "container_test.go:")
+		require.Contains(t, err.Error(), ": type *http.ServeMux[unknown] not exists in container")
+	})
+
+	t.Run("provide duplication of named definition", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		require.NoError(t, c.Provide(http.NewServeMux, di.WithName("first")))
+		err = c.Provide(http.NewServeMux, di.WithName("first"))
+		require.Error(t, err)
 	})
 }
 
@@ -143,7 +231,7 @@ func TestContainer_Resolve_Interface(t *testing.T) {
 		err := c.Resolve(&closer)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "container_test.go:")
-		require.Contains(t, err.Error(), ": io.Closer: have several implementations")
+		require.Contains(t, err.Error(), ": io.Closer: could not be resolved: have several instances")
 	})
 
 	t.Run("resolve constructor argument", func(t *testing.T) {
@@ -157,16 +245,69 @@ func TestContainer_Resolve_Interface(t *testing.T) {
 		c.MustResolve(&server)
 		c.MustEqualPointer(mux, server.Handler)
 	})
+
+	t.Run("resolve functions", func(t *testing.T) {
+		var result []string
+		fn1 := func() { result = append(result, "fn1") }
+		fn2 := func() { result = append(result, "fn2") }
+		fn3 := func() { result = append(result, "fn3") }
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		type MyFunc func()
+		require.NoError(t, c.Provide(func() MyFunc { return fn1 }))
+		require.NoError(t, c.Provide(func() MyFunc { return fn2 }))
+		require.NoError(t, c.Provide(func() MyFunc { return fn3 }))
+		var funcs []MyFunc
+		require.NoError(t, c.Resolve(&funcs))
+		require.Len(t, funcs, 3)
+		for _, fn := range funcs {
+			fn()
+		}
+		require.Equal(t, []string{"fn1", "fn2", "fn3"}, result)
+	})
+
+	t.Run("group updates on provide", func(t *testing.T) {
+		var result []string
+		fn1 := func() { result = append(result, "fn1") }
+		fn2 := func() { result = append(result, "fn2") }
+		fn3 := func() { result = append(result, "fn3") }
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		type MyFunc func()
+		var funcs []MyFunc
+		require.NoError(t, c.Provide(func() MyFunc { return fn1 }))
+		require.NoError(t, c.Resolve(&funcs))
+		require.Len(t, funcs, 1)
+		require.NoError(t, c.Provide(func() MyFunc { return fn2 }))
+		require.NoError(t, c.Resolve(&funcs))
+		require.Len(t, funcs, 2)
+		require.NoError(t, c.Provide(func() MyFunc { return fn3 }))
+		require.NoError(t, c.Resolve(&funcs))
+		require.Len(t, funcs, 3)
+	})
 }
 
 func TestContainer_Prototype(t *testing.T) {
-	t.Run("container resolve new instance of prototype by each resolve", func(t *testing.T) {
+	t.Run("resolve new instance of prototype by each resolve", func(t *testing.T) {
 		c := NewTestContainer(t)
 		err := c.Provide(func() *http.Server { return &http.Server{} }, di.Prototype())
 		require.NoError(t, err)
 		var extracted1 *http.Server
 		c.MustResolve(&extracted1)
 		var extracted2 *http.Server
+		c.MustResolve(&extracted2)
+		c.MustNotEqualPointer(extracted1, extracted2)
+	})
+
+	t.Run("resolve new instance of interface with prototype option", func(t *testing.T) {
+		c := NewTestContainer(t)
+		err := c.Provide(http.NewServeMux, di.Prototype(), di.As(new(http.Handler)))
+		require.NoError(t, err)
+		var extracted1 http.Handler
+		c.MustResolve(&extracted1)
+		var extracted2 http.Handler
 		c.MustResolve(&extracted2)
 		c.MustNotEqualPointer(extracted1, extracted2)
 	})
@@ -341,14 +482,11 @@ func TestContainer_Provide(t *testing.T) {
 		require.Contains(t, err.Error(), "invalid constructor signature, got func() (*http.Server, *http.ServeMux)")
 	})
 
-	t.Run("provide duplicate", func(t *testing.T) {
+	t.Run("provide duplicate not cause error", func(t *testing.T) {
 		c := NewTestContainer(t)
 		ctor := func() *http.Server { return nil }
 		c.MustProvide(ctor)
-		err := c.Provide(ctor)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "container_test.go:")
-		require.Contains(t, err.Error(), ": *http.Server already exists in dependency graph")
+		require.NoError(t, c.Provide(ctor))
 	})
 
 	t.Run("provide as not implemented interface cause error", func(t *testing.T) {
@@ -503,7 +641,6 @@ func TestContainer_Injectable(t *testing.T) {
 		}
 		c.MustProvide(func() *InjectableType { return &InjectableType{} })
 		var result *InjectableType
-		fmt.Println(c.Resolve(&result))
 		c.MustResolve(&result)
 		require.Nil(t, result.Mux)
 	})

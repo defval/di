@@ -67,4 +67,13 @@ func TestOptions(t *testing.T) {
 		)
 		require.True(t, err == myError)
 	})
+
+	t.Run("resolve failed", func(t *testing.T) {
+		_, err := di.New(
+			di.Resolve(func() {}),
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "options_test.go:")
+		require.Contains(t, err.Error(), ": resolve target must be a pointer, got func()")
+	})
 }

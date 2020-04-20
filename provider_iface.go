@@ -9,7 +9,8 @@ import (
 
 // providerInterface
 type providerInterface struct {
-	res      id
+	typ      reflect.Type
+	name     string
 	provider provider
 }
 
@@ -19,32 +20,34 @@ func newProviderInterface(provider provider, as interface{}) (*providerInterface
 	if err != nil {
 		return nil, err
 	}
-	if !provider.ID().Type.Implements(i.Type) {
-		return nil, fmt.Errorf("%s not implement %s", provider.ID(), i.Type)
+	if !provider.Type().Implements(i.Type) {
+		return nil, fmt.Errorf("%s not implement %s", provider.Type(), i.Type)
 	}
 	return &providerInterface{
-		res: id{
-			Name: provider.ID().Name,
-			Type: i.Type,
-		},
+		typ:      i.Type,
+		name:     provider.Name(),
 		provider: provider,
 	}, nil
 }
 
-func (i *providerInterface) ID() id {
-	return i.res
+func (i providerInterface) Type() reflect.Type {
+	return i.typ
 }
 
-func (i *providerInterface) ParameterList() parameterList {
+func (i providerInterface) Name() string {
+	return i.name
+}
+
+func (i providerInterface) ParameterList() parameterList {
 	var plist parameterList
 	plist = append(plist, parameter{
-		name:     i.provider.ID().Name,
-		typ:      i.provider.ID().Type,
+		name:     i.provider.Name(),
+		typ:      i.provider.Type(),
 		optional: false,
 	})
 	return plist
 }
 
-func (i *providerInterface) Provide(values ...reflect.Value) (reflect.Value, func(), error) {
+func (i providerInterface) Provide(values ...reflect.Value) (reflect.Value, func(), error) {
 	return values[0], nil, nil
 }

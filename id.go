@@ -5,10 +5,10 @@ import (
 	"reflect"
 )
 
-// key is a id of provider in container
+// id is a type identity
 type id struct {
-	Name string
 	Type reflect.Type
+	Name string
 }
 
 // String represent id as string.

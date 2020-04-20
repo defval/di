@@ -61,12 +61,12 @@ func newProviderConstructor(name string, fn reflection.Func) (*providerConstruct
 	return provider, nil
 }
 
-// ID returns provider resultant type id.
-func (c providerConstructor) ID() id {
-	return id{
-		Name: c.name,
-		Type: c.call.Out(0),
-	}
+func (c providerConstructor) Type() reflect.Type {
+	return c.call.Out(0)
+}
+
+func (c providerConstructor) Name() string {
+	return c.name
 }
 
 // ParameterList returns constructor parameter list.
@@ -122,7 +122,8 @@ func (c *providerConstructor) Provide(values ...reflect.Value) (reflect.Value, f
 	case ctorCleanupError:
 		return out.Result(), out.Cleanup(), out.Error(2)
 	}
-	panic("you found a bug, please create new issue for this: https://github.com/goava/di/issues/new")
+	bug()
+	return reflect.Value{}, nil, nil
 }
 
 // determineCtorType

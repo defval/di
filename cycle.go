@@ -2,7 +2,6 @@ package di
 
 import (
 	"errors"
-	"fmt"
 )
 
 const (
@@ -13,9 +12,9 @@ const (
 // used depth-first topological sort algorithm
 func checkCycles(c *Container, param parameter) error {
 	var marks = map[id]int{}
-	provider, exists := param.ResolveProvider(c)
-	if !exists {
-		return errParameterProviderNotFound{param}
+	provider, err := param.ResolveProvider(c)
+	if err != nil {
+		return err
 	}
 	if err := visit(c, provider, marks); err != nil {
 		return err
@@ -24,26 +23,31 @@ func checkCycles(c *Container, param parameter) error {
 }
 
 func visit(c *Container, provider provider, marks map[id]int) error {
-	id := provider.ID()
-	if marks[id] == permanent {
+	pid := id{provider.Type(), provider.Name()}
+	if marks[pid] == permanent {
 		return nil
 	}
-	if marks[id] == temporary {
+	if marks[pid] == temporary {
 		return errors.New("cycle detected") // todo: improve message
 	}
-	marks[id] = temporary
+	marks[pid] = temporary
 	for _, param := range provider.ParameterList() {
-		paramProvider, exists := param.ResolveProvider(c)
-		if !exists && param.optional {
+		paramProvider, err := param.ResolveProvider(c)
+		if _, ok := err.(errParameterProviderNotFound); ok && param.optional {
 			continue
 		}
-		if !exists {
-			return fmt.Errorf("%s: dependency %s not exists in container", provider.ID(), param)
+		if err != nil {
+			switch err.(type) {
+			case errParameterProviderNotFound:
+				return errDependencyNotFound{pid, param.ID()}
+			default:
+				return err
+			}
 		}
 		if err := visit(c, paramProvider, marks); err != nil {
 			return err
 		}
 	}
-	marks[id] = permanent
+	marks[pid] = permanent
 	return nil
 }

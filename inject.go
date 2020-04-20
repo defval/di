@@ -82,46 +82,47 @@ func inspectInjectableStructFieldType(field reflect.StructField) (injectableStru
 }
 
 // createStructProvider creates embed provider.
-func providerFromInjectableParameter(p parameter) *providerEmbed {
+func providerFromInjectableParameter(p parameter) *providerInjectable {
 	var typ reflect.Type
 	if p.typ.Kind() == reflect.Ptr {
 		typ = p.typ.Elem()
 	} else {
 		typ = p.typ
 	}
-	provider := &providerEmbed{
-		id: id{
-			Name: p.name,
-			Type: p.typ,
-		},
-		typ: typ,
-		val: reflect.New(typ).Elem(),
+	provider := &providerInjectable{
+		typ:  p.typ,
+		name: p.name,
+		val:  reflect.New(typ).Elem(),
 	}
 	provider.injectable.params, provider.injectable.fields = parseInjectableType(p.typ)
 	return provider
 }
 
-type providerEmbed struct {
-	id         id
+type providerInjectable struct {
 	typ        reflect.Type
-	val        reflect.Value
+	name       string
 	injectable struct {
 		// params parsed once
 		params []parameter
 		// field numbers parsed once
 		fields []int
 	}
+	val reflect.Value
 }
 
-func (p *providerEmbed) ID() id {
-	return p.id
+func (p providerInjectable) Type() reflect.Type {
+	return p.typ
 }
 
-func (p *providerEmbed) ParameterList() parameterList {
+func (p providerInjectable) Name() string {
+	return p.name
+}
+
+func (p providerInjectable) ParameterList() parameterList {
 	return p.injectable.params
 }
 
-func (p *providerEmbed) Provide(values ...reflect.Value) (reflect.Value, func(), error) {
+func (p providerInjectable) Provide(values ...reflect.Value) (reflect.Value, func(), error) {
 	// set injectable fields
 	if len(p.injectable.fields) > 0 {
 		// result value
@@ -130,7 +131,7 @@ func (p *providerEmbed) Provide(values ...reflect.Value) (reflect.Value, func(),
 			rv = rv.Elem()
 		}
 		if !rv.CanSet() {
-			panic("you found a bug, please create new issue for this: https://github.com/goava/di/issues/new")
+			bug()
 		}
 		// field index
 		for i, value := range values {
