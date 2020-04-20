@@ -17,6 +17,5 @@ func (pl parameterList) Resolve(c *Container) ([]reflect.Value, error) {
 		}
 		values = append(values, value)
 	}
-
 	return values, nil
 }

@@ -2,9 +2,27 @@ package di
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/goava/di/internal/stacktrace"
 )
+
+// isUsageError return true if err is library usage error.
+func isUsageError(err error) bool {
+	switch err.(type) {
+	case
+		ErrProvideFailed,
+		ErrResolveFailed,
+		ErrInvokeFailed,
+		errInvalidInvocation,
+		errParameterProviderNotFound,
+		errParameterProvideFailed,
+		errHaveSeveralInstances:
+		return true
+	default:
+		return false
+	}
+}
 
 func provideErrWithStack(err error) ErrProvideFailed {
 	return ErrProvideFailed{stacktrace.CallerFrame(1), err}
@@ -56,13 +74,13 @@ func (e ErrResolveFailed) Error() string {
 
 // errParameterProvideFailed causes when container found a provider but provide failed.
 type errParameterProvideFailed struct {
-	id  id    // type identity
-	err error // error
+	parameter parameter
+	err       error // error
 }
 
 // Error is a implementation of error interface.
 func (e errParameterProvideFailed) Error() string {
-	return fmt.Sprintf("%s: %s", e.id, e.err)
+	return fmt.Sprintf("%s: %s", e.parameter, e.err)
 }
 
 // errParameterProviderNotFound causes when container could not found a provider for parameter.
@@ -73,4 +91,25 @@ type errParameterProviderNotFound struct {
 // Error is a implementation of error interface.
 func (e errParameterProviderNotFound) Error() string {
 	return fmt.Sprintf("type %s not exists in container", e.param)
+}
+
+type errDependencyNotFound struct {
+	dependant key
+	parameter key
+}
+
+func (e errDependencyNotFound) Error() string {
+	return fmt.Sprintf("%s: dependency %s not exists in container", e.dependant, e.parameter)
+}
+
+type errHaveSeveralInstances struct {
+	typ reflect.Type
+}
+
+func (e errHaveSeveralInstances) Error() string {
+	return fmt.Sprintf("%s: could not be resolved: have several instances", e.typ)
+}
+
+func bug() {
+	panic("you found a bug, please create new issue for this: https://github.com/goava/di/issues/new")
 }

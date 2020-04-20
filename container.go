@@ -7,6 +7,27 @@ import (
 	"github.com/goava/di/internal/reflection"
 )
 
+// Container is a dependency injection container.
+type Container struct {
+	// Logger that logs internal actions.
+	logger Logger
+	// Initial options will be processed on di.New().
+	initial struct {
+		// Array of di.Provide() options.
+		provides []provideOptions
+		// Array of di.Invoke() options.
+		invokes []invokeOptions
+		// Array of di.Resolve() options.
+		resolves []resolveOptions
+	}
+	// Mapping from key to provider that can provide value for that key.
+	providers map[reflect.Type]*providerList
+	// Array of provider cleanups.
+	cleanups []func()
+	// Flag indicates acyclic verification state
+	verified map[key]bool
+}
+
 // New constructs container with provided options. Example usage (simplified):
 //
 // Define constructors and invocations:
@@ -37,76 +58,45 @@ import (
 //	}
 func New(options ...Option) (_ *Container, err error) {
 	c := &Container{
-		logger:     nopLogger{},
-		providers:  map[id]provider{},
-		values:     map[id]reflect.Value{},
-		prototypes: map[id]bool{},
-		cleanups:   []func(){},
-		verified:   map[id]bool{},
+		logger:    nopLogger{},
+		providers: map[reflect.Type]*providerList{},
+		cleanups:  []func(){},
+		verified:  map[key]bool{},
 	}
 	// apply container options
 	for _, opt := range options {
 		opt.apply(c)
 	}
-	// initial providing
+	// process di.Provide() options
 	for _, provide := range c.initial.provides {
-		err := c.provide(provide.constructor, provide.options...)
-		if err != nil {
+		if err := c.provide(provide.constructor, provide.options...); err != nil {
 			return nil, ErrProvideFailed{
 				provide.frame,
 				err,
 			}
 		}
 	}
-	// provide container to advanced usage e.g. conditional providing
+	// provide container to advanced usage e.g. condition providing
 	_ = c.provide(func() *Container { return c })
 	// error omitted because if logger could not be resolved it will be default
 	_ = c.resolve(&c.logger)
-	// initial invokes
+	// process di.Invoke() options
 	for _, invoke := range c.initial.invokes {
 		err := c.invoke(invoke.fn, invoke.options...)
+		if err != nil && isUsageError(err) {
+			return nil, ErrInvokeFailed{invoke.frame, err}
+		}
 		if err != nil {
-			switch err.(type) {
-			case errParameterProviderNotFound, errParameterProvideFailed, errInvalidInvocation:
-				return nil, ErrInvokeFailed{invoke.frame, err}
-			default:
-				// return error as is if not container error
-				return nil, err
-			}
+			return nil, err
 		}
 	}
-	// initial resolves
+	// process di.Resolve() options
 	for _, resolve := range c.initial.resolves {
 		if err := c.resolve(resolve.target, resolve.options...); err != nil {
 			return nil, ErrResolveFailed{resolve.frame, err}
 		}
 	}
 	return c, nil
-}
-
-// Container is a dependency injection container.
-type Container struct {
-	// Logger that logs internal actions.
-	logger Logger
-	// Initial options will be processed on di.New().
-	initial struct {
-		// Array of di.Provide() options.
-		provides []provideOptions
-		// Array of di.Invoke() options.
-		invokes []invokeOptions
-		// Array of di.Resolve() options.
-		resolves []resolveOptions
-	}
-	// Mapping from id to provider that can provide value for that id.
-	providers map[id]provider
-	// Mapping from id to already instantiated value for that id.
-	values map[id]reflect.Value
-	// Prototype mapping.
-	prototypes map[id]bool
-	// Array of provider cleanups.
-	cleanups []func()
-	// Flag indicates acyclic verification state
-	verified map[id]bool
 }
 
 // Provide provides to container reliable way to build type. The constructor will be invoked lazily on-demand.
@@ -123,8 +113,8 @@ func (c *Container) provide(constructor Constructor, options ...ProvideOption) e
 	if constructor == nil {
 		return fmt.Errorf("invalid constructor signature, got nil")
 	}
-	fn, isFn := reflection.InspectFunc(constructor)
-	if !isFn {
+	fn, valid := reflection.InspectFunc(constructor)
+	if !valid {
 		return fmt.Errorf("invalid constructor signature, got %s", reflect.TypeOf(constructor))
 	}
 	params := ProvideParams{}
@@ -133,63 +123,58 @@ func (c *Container) provide(constructor Constructor, options ...ProvideOption) e
 		opt.apply(&params)
 	}
 	// create constructor provider
-	prov, err := newProviderConstructor(params.Name, fn)
+	p, err := newProviderConstructor(params.Name, fn)
 	if err != nil {
 		return err
 	}
-	cleanup := prov.ctorType == ctorCleanup || prov.ctorType == ctorCleanupError
+	cleanup := p.ctorType == ctorCleanup || p.ctorType == ctorCleanupError
 	if cleanup && params.IsPrototype {
 		return fmt.Errorf("cleanup not supported with prototype providers")
 	}
-	if _, ok := c.providers[prov.ID()]; ok {
-		// duplicate types not allowed
-		return fmt.Errorf("%s already exists in dependency graph", prov.ID())
+	// provider list
+	plist, ok := c.providers[p.Type()]
+	if !ok {
+		// create list of providers
+		plist = createProviderList()
+		c.providers[p.Type()] = plist
 	}
-	c.providers[prov.ID()] = prov
-	// save prototype flag
-	c.prototypes[prov.ID()] = params.IsPrototype
-	// process di.As() options and create group of interfaces
-	if err := c.processInterfaces(prov, params.Interfaces); err != nil {
+	fp := provider(p)
+	if !params.IsPrototype {
+		fp = asSingleton(p)
+	}
+	uniq, err := plist.Add(fp)
+	if err != nil {
+		return err
+	}
+	link := keyUniq{key{fp.Type(), fp.Name()}, uniq}
+	if err := c.processInterfaces(link, params.Interfaces, params.IsPrototype); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *Container) processInterfaces(prov provider, interfaces []Interface) error {
-	iprovs := make([]*providerInterface, 0, len(interfaces))
-	// process interfaces
-	for _, i := range interfaces {
-		// create interface provider
-		iprov, err := newProviderInterface(prov, i)
+func (c *Container) processInterfaces(key keyUniq, interfaces []Interface, isPrototype bool) error {
+	// interface raw
+	for _, iraw := range interfaces {
+		// provider interface
+		piface, err := newProviderInterface(key.uniq, key.key, iraw)
 		if err != nil {
 			return err
 		}
-		existing, ok := c.providers[iprov.ID()]
+		// interface list
+		ilist, ok := c.providers[piface.Type()]
 		if !ok {
-			c.providers[iprov.ID()] = iprov
+			ilist = createProviderList()
+			c.providers[piface.Type()] = ilist
+
 		}
-		// if provider already exists resolve it as interface restricted, but it can exists in group
-		_, alreadyStub := existing.(*providerStub)
-		if ok && !alreadyStub {
-			stub := newProviderStub(iprov.ID(), "have several implementations")
-			c.providers[iprov.ID()] = stub
+		fpiface := provider(piface)
+		if !isPrototype {
+			fpiface = asSingleton(piface)
 		}
-		iprovs = append(iprovs, iprov)
-	}
-	// process group for interfaces
-	for _, iprov := range iprovs {
-		groupID := id{
-			Type: reflect.SliceOf(iprov.ID().Type),
-		}
-		existing, ok := c.providers[groupID]
-		if ok {
-			// if group node already exists use it
-			existing.(*providerGroup).Add(prov.ID())
-		}
-		if !ok {
-			group := newProviderGroup(iprov.ID())
-			group.Add(prov.ID())
-			c.providers[groupID] = group
+		_, err = ilist.Add(fpiface)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
@@ -225,12 +210,12 @@ func (c *Container) resolve(into interface{}, options ...ResolveOption) error {
 		typ:  reflect.TypeOf(into).Elem(),
 	}
 	// check cycle verified
-	if !c.verified[param.ID()] {
+	if !c.verified[param.Key()] {
 		err := checkCycles(c, param)
 		if err != nil {
 			return err
 		}
-		c.verified[param.ID()] = true
+		c.verified[param.Key()] = true
 	}
 	value, err := param.ResolveValue(c)
 	if err != nil {
@@ -244,14 +229,12 @@ func (c *Container) resolve(into interface{}, options ...ResolveOption) error {
 // Invoke calls the function fn. It parses function parameters. Looks for it in a container.
 // And invokes function with them. See Invocation for details.
 func (c *Container) Invoke(invocation Invocation, options ...InvokeOption) error {
-	if err := c.invoke(invocation, options...); err != nil {
-		switch err.(type) {
-		case errParameterProviderNotFound, errParameterProvideFailed, errInvalidInvocation:
-			return invokeErrWithStack(err)
-		default:
-			// return error as is
-			return err
-		}
+	err := c.invoke(invocation, options...)
+	if err != nil && isUsageError(err) {
+		return invokeErrWithStack(err)
+	}
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -278,12 +261,12 @@ func (c *Container) invoke(invocation Invocation, _ ...InvokeOption) error {
 			optional: false,
 		}
 		// check cycle verified
-		if !c.verified[param.ID()] {
+		if !c.verified[param.Key()] {
 			err := checkCycles(c, param)
 			if err != nil {
 				return errInvalidInvocation{err}
 			}
-			c.verified[param.ID()] = true
+			c.verified[param.Key()] = true
 		}
 		plist = append(plist, param)
 	}
@@ -320,8 +303,15 @@ func (c *Container) Has(into interface{}, options ...ResolveOption) bool {
 		name: params.Name,
 		typ:  typ.Elem(),
 	}
-	_, exists := param.ResolveProvider(c)
-	return exists
+	_, err := param.ResolveProvider(c)
+	if err == nil {
+		return true
+	}
+	if _, ok := err.(errParameterProviderNotFound); ok {
+		return false
+	}
+	bug()
+	return false
 }
 
 // Cleanup runs destructors in reverse order that was been created.

@@ -9,42 +9,48 @@ import (
 
 // providerInterface
 type providerInterface struct {
-	res      id
-	provider provider
+	source keyUniq
+	result key
 }
 
 // newProviderInterface
-func newProviderInterface(provider provider, as interface{}) (*providerInterface, error) {
-	i, err := reflection.InspectInterfacePtr(as)
+func newProviderInterface(uniq string, k key, as interface{}) (*providerInterface, error) {
+	iface, err := reflection.InspectInterfacePtr(as)
 	if err != nil {
 		return nil, err
 	}
-	if !provider.ID().Type.Implements(i.Type) {
-		return nil, fmt.Errorf("%s not implement %s", provider.ID(), i.Type)
+	if !k.Type.Implements(iface.Type) {
+		return nil, fmt.Errorf("%s not implement %s", k, iface.Type)
 	}
 	return &providerInterface{
-		res: id{
-			Name: provider.ID().Name,
-			Type: i.Type,
-		},
-		provider: provider,
+		source: keyUniq{k, uniq},
+		result: key{iface.Type, k.Name},
 	}, nil
 }
 
-func (i *providerInterface) ID() id {
-	return i.res
+// Type
+func (p providerInterface) Type() reflect.Type {
+	return p.result.Type
 }
 
-func (i *providerInterface) ParameterList() parameterList {
+// Name
+func (p providerInterface) Name() string {
+	return p.result.Name
+}
+
+// ParameterList
+func (p providerInterface) ParameterList() parameterList {
 	var plist parameterList
 	plist = append(plist, parameter{
-		name:     i.provider.ID().Name,
-		typ:      i.provider.ID().Type,
+		uniq:     p.source.uniq,
+		name:     p.source.Name,
+		typ:      p.source.Type,
 		optional: false,
 	})
 	return plist
 }
 
-func (i *providerInterface) Provide(values ...reflect.Value) (reflect.Value, func(), error) {
+// Provide
+func (p providerInterface) Provide(values ...reflect.Value) (reflect.Value, func(), error) {
 	return values[0], nil, nil
 }

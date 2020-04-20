@@ -5,16 +5,21 @@ import (
 	"reflect"
 )
 
-// key is a id of provider in container
-type id struct {
-	Name string
+// key is a type identity
+type key struct {
 	Type reflect.Type
+	Name string
 }
 
-// String represent id as string.
-func (i id) String() string {
+// String represent key as string.
+func (i key) String() string {
 	if i.Name == "" {
 		return fmt.Sprintf("%s", i.Type)
 	}
 	return fmt.Sprintf("%s[%s]", i.Type, i.Name)
+}
+
+type keyUniq struct {
+	key
+	uniq string
 }

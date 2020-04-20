@@ -5,42 +5,41 @@ import (
 )
 
 // newProviderGroup creates new group from provided key.
-func newProviderGroup(k id) *providerGroup {
-	id := id{
-		Type: reflect.SliceOf(k.Type), // creates []<type> group
+func newProviderGroup(gtype reflect.Type, plist *providerList) *providerGroup {
+	var params parameterList
+	for _, p := range plist.Uniqs() {
+		params = append(params, parameter{
+			uniq:     p.uniq,
+			typ:      p.Type(),
+			name:     p.Name(),
+			optional: false,
+		})
 	}
 	return &providerGroup{
-		id: id,
-		pl: parameterList{},
+		typ:    gtype,
+		params: params,
 	}
 }
 
 // providerGroup
 type providerGroup struct {
-	id id
-	pl parameterList
+	typ    reflect.Type
+	params parameterList
 }
 
-func (i *providerGroup) ID() id {
-	return i.id
+func (p providerGroup) Type() reflect.Type {
+	return p.typ
 }
 
-// Add
-func (i *providerGroup) Add(k id) {
-	i.pl = append(i.pl, parameter{
-		name:     k.Name,
-		typ:      k.Type,
-		optional: false,
-	})
+func (p providerGroup) Name() string {
+	return ""
 }
 
-// parameters
-func (i providerGroup) ParameterList() parameterList {
-	return i.pl
+func (p providerGroup) ParameterList() parameterList {
+	return p.params
 }
 
-// Provide
-func (i providerGroup) Provide(values ...reflect.Value) (reflect.Value, func(), error) {
-	group := reflect.New(i.id.Type).Elem()
+func (p providerGroup) Provide(values ...reflect.Value) (reflect.Value, func(), error) {
+	group := reflect.New(p.typ).Elem()
 	return reflect.Append(group, values...), nil, nil
 }

@@ -7,78 +7,96 @@ import (
 
 // parameterRequired
 type parameter struct {
-	name     string       // string identifier
+	uniq     string       // internal uniq key, optional
 	typ      reflect.Type // resultant type
+	name     string       // string identifier
 	optional bool         // optional flag
 }
 
-// ID returns parameter identity.
-func (p parameter) ID() id {
-	return id{
-		Name: p.name,
-		Type: p.typ,
-	}
+// Key returns parameter identity.
+func (p parameter) Key() key {
+	return key{p.typ, p.name}
 }
 
 // String represents parameter as string.
 func (p parameter) String() string {
-	return id{Name: p.name, Type: p.typ}.String()
+	return p.Key().String()
 }
 
 // ResolveProvider resolves type in container c.
-func (p parameter) ResolveProvider(c *Container) (provider, bool) {
-	id := id{
-		Name: p.name,
-		Type: p.typ,
+func (p parameter) ResolveProvider(c *Container) (provider, error) {
+	plist, exists := c.providers[p.typ]
+	// only one provider of type
+	if exists && plist.Len() == 1 {
+		return plist.ByIndex(0), nil
 	}
-	provider, exists := c.providers[id]
+	if exists && p.uniq != "" {
+		return plist.ByUniq(p.uniq), nil
+	}
+	// named provider
+	if exists && plist.Len() > 1 && p.name != "" {
+		prov, ok := findNamedProvider(plist, p.name)
+		if !ok {
+			return nil, errParameterProviderNotFound{p}
+		}
+		return prov, nil
+	}
+	if exists && plist.Len() > 1 && p.name == "" {
+		return nil, errHaveSeveralInstances{p.typ}
+	}
+	// injectable parameter
 	if !exists && isInjectable(p.typ) {
 		// constructor result with di.Inject - only addressable pointers
 		// anonymous parameters with di.Inject - only struct
 		if p.typ.Kind() == reflect.Ptr {
-			return nil, false
+			return nil, errParameterProviderNotFound{p}
 		}
-		return providerFromInjectableParameter(p), true
+		return providerFromInjectableParameter(p), nil
 	}
-	if !exists {
-		return nil, false
+	// not group of type
+	if !exists && p.typ.Kind() != reflect.Slice {
+		return nil, errParameterProviderNotFound{p}
 	}
-	return provider, true
+	// check group
+	if !exists && p.typ.Kind() == reflect.Slice {
+		gtype := p.typ.Elem()
+		all, ok := c.providers[gtype]
+		if !ok {
+			return nil, errParameterProviderNotFound{p}
+		}
+		return newProviderGroup(p.typ, all), nil
+	}
+	return nil, errParameterProviderNotFound{p}
 }
 
 // ResolveValue resolves value in container c.
 func (p parameter) ResolveValue(c *Container) (reflect.Value, error) {
-	prototype := c.prototypes[p.ID()]
-	if existing, ok := c.values[p.ID()]; ok && !prototype {
-		return existing, nil
-	}
-	provider, exists := p.ResolveProvider(c)
-	if !exists && p.optional {
+	provider, err := p.ResolveProvider(c)
+	if _, ok := err.(errParameterProviderNotFound); ok && p.optional {
 		return reflect.New(p.typ).Elem(), nil
 	}
-	if !exists {
-		return reflect.Value{}, errParameterProviderNotFound{param: p}
+	if err != nil {
+		return reflect.Value{}, err
 	}
-	pl := provider.ParameterList()
-	values, err := pl.Resolve(c)
+	plist := provider.ParameterList()
+	values, err := plist.Resolve(c)
 	if err != nil {
 		switch cerr := err.(type) {
 		case errParameterProviderNotFound:
-			return reflect.Value{}, fmt.Errorf("%s: dependency %s not exists in container", p, cerr.param)
+			return reflect.Value{}, errDependencyNotFound{p.Key(), cerr.param.Key()}
 		default:
 			return reflect.Value{}, fmt.Errorf("%s: %s", p, err)
 		}
 	}
-	if len(pl) > 0 {
-		c.logger.Logf("%s resolved with: %s", p, pl)
+	if len(plist) > 0 {
+		c.logger.Logf("%s resolved with: %s", p, plist)
 	} else {
 		c.logger.Logf("%s resolved", p)
 	}
 	value, cleanup, err := provider.Provide(values...)
 	if err != nil {
-		return value, errParameterProvideFailed{id: provider.ID(), err: err}
+		return value, errParameterProvideFailed{p, err}
 	}
-	c.values[provider.ID()] = value
 	if cleanup != nil {
 		c.cleanups = append(c.cleanups, cleanup)
 	}
