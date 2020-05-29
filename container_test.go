@@ -316,6 +316,30 @@ func TestContainer_Resolve_Interface(t *testing.T) {
 		require.Equal(t, fmt.Sprintf("%p", conn), fmt.Sprintf("%p", conn))
 
 	})
+
+	t.Run("resolve existing unnamed definition with named", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NoError(t, c.Provide(http.NewServeMux))
+		require.NoError(t, c.Provide(http.NewServeMux, di.WithName("two")))
+		require.NoError(t, c.Provide(http.NewServeMux, di.WithName("three")))
+		var mux *http.ServeMux
+		require.NoError(t, c.Resolve(&mux))
+		require.NoError(t, c.Resolve(&mux, di.Name("two")))
+		require.NoError(t, c.Resolve(&mux, di.Name("three")))
+	})
+
+	t.Run("resolve not existing unnamed definition with named", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NoError(t, c.Provide(http.NewServeMux, di.WithName("two")))
+		require.NoError(t, c.Provide(http.NewServeMux, di.WithName("three")))
+		var mux *http.ServeMux
+		err = c.Resolve(&mux)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "/Users/defval/Development/goava/di/container_test.go")
+		require.Contains(t, err.Error(), ": *http.ServeMux: could not be resolved: have several instances")
+	})
 }
 
 func TestContainer_Prototype(t *testing.T) {

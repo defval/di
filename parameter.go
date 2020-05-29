@@ -34,15 +34,12 @@ func (p parameter) ResolveProvider(c *Container) (provider, error) {
 		return plist.ByUniq(p.uniq), nil
 	}
 	// named provider
-	if exists && plist.Len() > 1 && p.name != "" {
-		prov, ok := findNamedProvider(plist, p.name)
-		if !ok {
-			return nil, errParameterProviderNotFound{p}
+	if exists && plist.Len() > 1 {
+		prov, err := findNamedProvider(plist, p)
+		if err != nil {
+			return nil, err
 		}
 		return prov, nil
-	}
-	if exists && plist.Len() > 1 && p.name == "" {
-		return nil, errHaveSeveralInstances{p.typ}
 	}
 	// injectable parameter
 	if !exists && isInjectable(p.typ) {
