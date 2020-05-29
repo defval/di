@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!--## [Unrealeased]-->
 
+## v1.2.1
+
+### Fixed
+
+- [Using `di.WithName()` breaks when having one entry without a `di.Name()`](https://github.com/goava/di/issues/16): 
+
 ## v1.2.0
 
 ### Added
