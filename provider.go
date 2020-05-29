@@ -79,11 +79,20 @@ func (l providerList) ByUniq(uniq string) provider {
 	return l.providers[uniq]
 }
 
-func findNamedProvider(plist *providerList, name string) (provider, bool) {
+func findNamedProvider(plist *providerList, param parameter) (result provider, _ error) {
 	for _, p := range plist.All() {
-		if p.Name() == name {
-			return p, true
+		if p.Name() == param.name {
+			if result != nil {
+				return nil, errHaveSeveralInstances{typ: param.typ}
+			}
+			result = p
 		}
 	}
-	return nil, false
+	if param.name == "" && result == nil {
+		return nil, errHaveSeveralInstances{typ: param.typ}
+	}
+	if result != nil {
+		return result, nil
+	}
+	return nil, errParameterProviderNotFound{param: param}
 }
