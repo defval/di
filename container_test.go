@@ -337,7 +337,7 @@ func TestContainer_Resolve_Interface(t *testing.T) {
 		var mux *http.ServeMux
 		err = c.Resolve(&mux)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "/Users/defval/Development/goava/di/container_test.go")
+		require.Contains(t, err.Error(), "container_test.go")
 		require.Contains(t, err.Error(), ": *http.ServeMux: could not be resolved: have several instances")
 	})
 }
