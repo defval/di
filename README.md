@@ -46,7 +46,7 @@ go get github.com/goava/di
 
 ## Tutorial
 
-Let's learn to use di by example. We will code a simple application
+Let's learn to use `di` by example. We will code a simple application
 that processes HTTP requests.
 
 The full tutorial code is available [here](./_examples/tutorial/main.go)
