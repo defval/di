@@ -49,7 +49,7 @@ go get github.com/goava/di
 Let's learn to use `di` by example. We will code a simple application
 that processes HTTP requests.
 
-The full tutorial code is available [here](./_examples/tutorial/main.go)
+The full tutorial code is available [here](./_examples/tutorial/main.go).
 
 ### Provide
 
@@ -77,7 +77,7 @@ func NewServeMux() *http.ServeMux {
 > func([dep1, dep2, depN]) (result, [cleanup, error])
 > ```
 
-Now, we can teach the container to build these types in three style ways:
+Now we can teach the container to build these types in three ways:
 
 In preferred functional option style:
 
@@ -94,15 +94,11 @@ if err != nil {
 
 ### Resolve
 
-Next, we can resolve the built server from the container. For this, define the
+Next we can resolve the built server from the container. For this define the
 variable of resolved type and pass variable pointer to `Resolve`
 function.
 
-> If resolved type not found or the process of building instance cause
-> error.
-
-If no error occurred, we can use the variable as if we had built it
-yourself.
+If no error occurred we can use the variable.
 
 ```go
 // declare type variable
@@ -116,13 +112,13 @@ if err != nil {
 server.ListenAndServe()
 ```
 
-> Note that by default, the container creates instances as a singleton.
+> Note, by default the container creates singletons.
 > But you can change this behaviour. See [Prototypes](https://github.com/goava/di#prototypes).
 
 ### Invoke
 
-As an alternative to resolving we can use `Invoke()` function of `Container`. It builds
-dependencies and call provided function. Invoke function may return optional error.
+As an alternative to resolve we can use `Invoke()` function of `Container`. It builds
+dependencies and calls provided function. Invoke function can return optional error.
 
 ```go
 // StartServer starts the server.
@@ -147,17 +143,27 @@ if err != nil {
 }
 ```
 
-Container run all invoke functions on compile stage. If one of them
-failed (return error), compile cause error.
+The container runs all `invoke functions` on the compile stage in the order they were declared. If one of then fails, the
+compilation fails.
 
 ### Lazy-loading
 
 Result dependencies will be lazy-loaded. If no one requires a type from
-the container it will not be constructed.
+the container it won't be constructed.
 
 ### Interfaces
 
-Container make possible to provide implementation as an interface.
+You can provide implementation as an interface. Use `di.As()` for it.
+The arguments of this option must be a pointer(s) to an interface like `new(http.Handler)`.
+
+```go
+di.Provide(NewServeMux, di.As(new(http.Handler)))
+```
+
+> This syntax can look strange, but I haven't found a better way to
+> specify the interface.
+
+Updated server constructor:
 
 ```go
 // NewServer creates a http server with provided mux as handler.
@@ -165,17 +171,10 @@ func NewServer(handler http.Handler) *http.Server {
 	return &http.Server{
 		Handler: handler,
 	}
-}
+
 ```
 
-For a container to know that as an implementation of `http.Handler` is
-necessary to use, we use the option `di.As()`. The arguments of this
-option must be a pointer(s) to an interface like `new(Endpoint)`.
-
-> This syntax may seem strange, but I have not found a better way to
-> specify the interface.
-
-Updated container initialization code:
+Final code:
 
 ```go
 container, err := di.New(
@@ -189,18 +188,18 @@ if err != nil {
 }
 ```
 
-Now container uses provide `*http.ServeMux` as `http.Handler` in server
-constructor. Using interfaces contributes to writing more testable code.
+Now container use `*http.ServeMux` as implementation of `http.Handler`. 
+Interaface usage contributes to write more testable code.
 
 ### Groups
 
-Container automatically groups same types to `[]<type>` slice. It works with `di.As()`.
-For example, provide with `di.As(new(http.Handler)` automatically creates a group
+##### Grouping
+
+Container automatically groups the same types to `[]<type>` slice. It works with `di.As()` too.
+For example, `di.As(new(http.Handler)` automatically creates a group
 `[]http.Handler`.
 
-Let's add some http controllers using this feature. Controllers have
-typical behavior. It is registering routes. At first, will create an
-interface for it.
+Let's add some http controllers using this feature. The main function of controllers is registering routes. At first, will create an interface for it.
 
 ```go
 // Controller is an interface that can register its routes.
@@ -209,9 +208,9 @@ type Controller interface {
 }
 ```
 
-Now we will write controllers and implement `Controller` interface.
+Next step is make implementation for this interface.
 
-##### OrderController
+##### Order implementation
 
 ```go
 // OrderController is a http controller for orders.
@@ -233,7 +232,7 @@ func (a *OrderController) RetrieveOrders(writer http.ResponseWriter, request *ht
 }
 ```
 
-##### UserController
+##### User implementation
 
 ```go
 // UserController is a http endpoint for a user.
@@ -255,6 +254,8 @@ func (e *UserController) RetrieveUsers(writer http.ResponseWriter, request *http
 }
 ```
 
+##### Container initialization code
+
 Just like in the example with interfaces, we will use `di.As()`
 provide option.
 
@@ -271,7 +272,7 @@ if err != nil {
 }
 ```
 
-Now, we can use `[]Controller` group in our mux. See updated code:
+Now we can use `[]Controller` group in our mux. Updated code:
 
 ```go
 // NewServeMux creates a new http serve mux.
@@ -292,7 +293,7 @@ The full tutorial code is available [here](./_examples/tutorial/main.go)
 
 ### Modules
 
-With container option `Options()` you can group your functionality:
+You can group previous options into single variable by using `di.Options()` :
 
 ```go
 // account module
@@ -317,7 +318,7 @@ if err != nil {
 
 ### Named definitions
 
-In some cases you have more than one instance of one type. For example
+If you have more than one instances of same type, you can specify alias. For example
 two instances of database: master - for writing, slave - for reading.
 
 First way is a wrapping types:
@@ -334,8 +335,7 @@ type SlaveDatabase struct {
 }
 ```
 
-Second way is a using named definitions with `di.WithName()` provide
-option:
+Second way is a using named definitions with `di.WithName()` *invoke option*:
 
 ```go
 // provide master database
@@ -344,8 +344,7 @@ di.Provide(NewMasterDatabase, di.WithName("master"))
 di.Provide(NewSlaveDatabase, di.WithName("slave"))
 ```
 
-If you need to resolve it from container use `di.Name()` resolve
-option.
+If you need to resolve it from the container use `di.Name()` *resolve option*.
 
 ```go
 var db *Database
@@ -405,8 +404,9 @@ type ServiceParameter struct {
 
 ### Fill struct
 
-To avoid constant constructor changes, you can also use `di.Inject`. Note, that supported only
-struct pointers as constructing result.
+To avoid constant constructor changes, you can use `di.Inject`. Only
+struct pointers are supported as constructing result. And only 
+`di`-taged fields will be injected.
 
 ```go
 // Controller has some endpoints.
@@ -424,12 +424,11 @@ func NewController() *Controller {
 }
 ```
 
-> Note, that such a constructor will be incorrect without using `di`
+> Note such constructor will not be working without `di` library.
 
 ### Prototypes
 
-If you want to create a new instance on each extraction use
-`di.Prototype()` provide option.
+Use `di.Prototype()` option to create new instance for each resolve.
 
 ```go
 di.Provide(NewRequestContext, di.Prototype())
@@ -437,7 +436,7 @@ di.Provide(NewRequestContext, di.Prototype())
 
 ### Cleanup
 
-If a provider creates a value that needs to be cleaned up, then it can
+If the constructor creates a value that needs to be cleaned up, then it can
 return a closure to clean up the resource.
 
 ```go
@@ -455,7 +454,7 @@ func NewFile(log Logger, path Path) (*os.File, func(), error) {
 }
 ```
 
-After `container.Cleanup()` call, it iterate over instances and call
+After `container.Cleanup()` call, it iterates over instances and calls
 cleanup function if it exists.
 
 ```go
