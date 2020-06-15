@@ -15,15 +15,16 @@ type Inject struct {
 	injectable
 }
 
-// internalParameter
+// injectable interface needs to struct fields injection functional.
 type injectable interface {
 	isInjectable()
 }
 
 var injectableInterface = reflect.TypeOf(new(injectable)).Elem()
 
-// isInjectable checks that typ is injectable.
-func isInjectable(typ reflect.Type) bool {
+// canInject checks that typ is injectable
+// Injectable type can be pointer to struct or struct and need to embed di.Inject.
+func canInject(typ reflect.Type) bool {
 	if typ.Kind() == reflect.Ptr && typ.Elem().Kind() == reflect.Struct {
 		return typ.Implements(injectableInterface)
 	}
@@ -33,7 +34,9 @@ func isInjectable(typ reflect.Type) bool {
 	return false
 }
 
-func parseInjectableType(rt reflect.Type) (params []parameter, fields []int) {
+// parseFieldParams parses struct fields with di tag and form array of parameters associated
+// with their field number.
+func parseFieldParams(rt reflect.Type) (fields []int, params []parameter) {
 	if rt.Kind() == reflect.Ptr {
 		rt = rt.Elem()
 	}
@@ -59,7 +62,7 @@ func parseInjectableType(rt reflect.Type) (params []parameter, fields []int) {
 		})
 		fields = append(fields, fi)
 	}
-	return params, fields
+	return fields, params
 }
 
 // injectableStructFieldTag contains injectable field params
@@ -94,7 +97,7 @@ func providerFromInjectableParameter(p parameter) *providerInjectable {
 		name: p.name,
 		val:  reflect.New(typ).Elem(),
 	}
-	provider.injectable.params, provider.injectable.fields = parseInjectableType(p.typ)
+	provider.injectable.fields, provider.injectable.params = parseFieldParams(p.typ)
 	return provider
 }
 

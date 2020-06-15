@@ -42,7 +42,7 @@ func (p parameter) ResolveProvider(c *Container) (provider, error) {
 		return prov, nil
 	}
 	// injectable parameter
-	if !exists && isInjectable(p.typ) {
+	if !exists && canInject(p.typ) {
 		// constructor result with di.Inject - only addressable pointers
 		// anonymous parameters with di.Inject - only struct
 		if p.typ.Kind() == reflect.Ptr {

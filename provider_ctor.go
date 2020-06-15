@@ -25,12 +25,13 @@ type providerConstructor struct {
 	// constructor
 	ctorType ctorType
 	call     reflection.Func
-	// injectable params
-	injectable struct {
-		// params parsed once
-		params []parameter
+	params   parameterList
+	// inject params
+	inject struct {
 		// field numbers parsed once
 		fields []int
+		// params parsed once
+		params []parameter
 	}
 	// clean callback
 	clean *reflection.Func
@@ -51,13 +52,23 @@ func newProviderConstructor(name string, fn reflection.Func) (*providerConstruct
 	rt := fn.Out(0)
 	// constructor result with di.Inject - only addressable pointers
 	// anonymous parameters with di.Inject - only struct
-	if isInjectable(rt) && rt.Kind() != reflect.Ptr {
+	if canInject(rt) && rt.Kind() != reflect.Ptr {
 		return nil, fmt.Errorf("di.Inject not supported for unaddressable result of constructor, use *%s instead", rt)
 	}
-	// if struct is injectable, range over injectableFields and parse injectable params
-	if isInjectable(rt) {
-		provider.injectable.params, provider.injectable.fields = parseInjectableType(rt)
+	// if struct is injectable, range over inject fields and parse injectable params
+	if canInject(rt) {
+		provider.inject.fields, provider.inject.params = parseFieldParams(rt)
 	}
+	var params parameterList
+	for i := 0; i < provider.call.NumIn(); i++ {
+		in := provider.call.In(i)
+		params = append(params, parameter{
+			// haven't found the way to specify name for type in function
+			name: "",
+			typ:  in,
+		})
+	}
+	provider.params = append(params, provider.inject.params...)
 	return provider, nil
 }
 
@@ -71,16 +82,7 @@ func (c providerConstructor) Name() string {
 
 // ParameterList returns constructor parameter list.
 func (c *providerConstructor) ParameterList() parameterList {
-	// todo: move to constructor
-	var pl parameterList
-	for i := 0; i < c.call.NumIn(); i++ {
-		in := c.call.In(i)
-		pl = append(pl, parameter{
-			name: "", // constructor parameters could be resolved only with empty ("") name
-			typ:  in,
-		})
-	}
-	return append(pl, c.injectable.params...)
+	return c.params
 }
 
 // Provide provides resultant.
@@ -99,7 +101,7 @@ func (c *providerConstructor) Provide(values ...reflect.Value) (reflect.Value, f
 		return rv, nil, out.Error(2)
 	}
 	// set injectable fields
-	if len(c.injectable.fields) > 0 {
+	if len(c.inject.fields) > 0 {
 		// result value
 		if rv.Kind() == reflect.Ptr {
 			rv = rv.Elem()
@@ -108,7 +110,7 @@ func (c *providerConstructor) Provide(values ...reflect.Value) (reflect.Value, f
 		// field index
 		for i, value := range fields {
 			// field value
-			fv := rv.Field(c.injectable.fields[i])
+			fv := rv.Field(c.inject.fields[i])
 			fv.Set(value)
 		}
 	}
@@ -128,18 +130,17 @@ func (c *providerConstructor) Provide(values ...reflect.Value) (reflect.Value, f
 
 // determineCtorType
 func determineCtorType(fn reflection.Func) ctorType {
-	if fn.NumOut() == 1 {
+	switch true {
+	case fn.NumOut() == 1:
 		return ctorStd
-	}
-	if fn.NumOut() == 2 {
+	case fn.NumOut() == 2:
 		if reflection.IsError(fn.Out(1)) {
 			return ctorError
 		}
 		if reflection.IsCleanup(fn.Out(1)) {
 			return ctorCleanup
 		}
-	}
-	if fn.NumOut() == 3 && reflection.IsCleanup(fn.Out(1)) && reflection.IsError(fn.Out(2)) {
+	case fn.NumOut() == 3 && reflection.IsCleanup(fn.Out(1)) && reflection.IsError(fn.Out(2)):
 		return ctorCleanupError
 	}
 	return ctorUnknown

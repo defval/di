@@ -10,6 +10,16 @@ Dependency injection is one form of the broader technique of inversion
 of control. It is used to increase modularity of the program and make it
 extensible.
 
+## Features
+
+- **Autowiring**
+- **Type groups**
+- **Interface binding**
+- **Named definitions**
+- **Functional options API**
+- **Optional dependencies**
+- **Cleanup**
+
 ## Contents
 
 - [Documentation](https://github.com/goava/di#documentation)
@@ -25,7 +35,7 @@ extensible.
   - [Modules](https://github.com/goava/di#modules)
   - [Named definitions](https://github.com/goava/di#named-definitions)
   - [Optional parameters](https://github.com/goava/di#optional-parameters)
-  - [Fill struct](https://github.com/goava/di#fill-struct)
+  - [Struct field injection](https://github.com/goava/di#struct-fields-injection)
   - [Prototypes](https://github.com/goava/di#prototypes)
   - [Cleanup](https://github.com/goava/di#cleanup)
 - [Comparison](https://github.com/goava/di#comparison)
@@ -319,56 +329,56 @@ if err != nil {
 ### Named definitions
 
 If you have more than one instances of same type, you can specify alias. For example
-two instances of database: master - for writing, slave - for reading.
+two instances of database: leader - for writing, follower - for reading.
 
-First way is a wrapping types:
+#### Wrap type into another unique type
 
 ```go
-// MasterDatabase provide write database access.
-type MasterDatabase struct {
+// Leader provides write database access.
+type Leader struct {
 	*Database
 }
 
-// SlaveDatabase provide read database access.
-type SlaveDatabase struct {
+// Follower provides read database access.
+type Follower struct {
 	*Database
 }
 ```
 
-Second way is a using named definitions with `di.WithName()` *invoke option*:
+#### Specify name with `di.WithName()` *invoke option*:
 
 ```go
-// provide master database
-di.Provide(NewMasterDatabase, di.WithName("master"))
-// provide slave database
-di.Provide(NewSlaveDatabase, di.WithName("slave"))
+// provide leader database
+di.Provide(NewLeader, di.WithName("leader"))
+// provide follower database
+di.Provide(NewFollower, di.WithName("follower"))
 ```
 
 If you need to resolve it from the container use `di.Name()` *resolve option*.
 
 ```go
 var db *Database
-container.Resolve(&db, di.Name("master"))
+container.Resolve(&db, di.Name("leader"))
 ```
 
 If you need to provide named definition in another constructor embed
 `di.Inject`.
 
 ```go
-// ServiceParameters
-type ServiceParameters struct {
+// Parameters
+type Parameters struct {
 	di.Inject
 	
 	// use `di` tag for the container to know that field need to be injected.
-	MasterDatabase *Database `di:"master"`
-	SlaveDatabase *Database  `di:"slave"`
+	Leader *Database `di:"leader"`
+	Follower *Database  `di:"follower"`
 }
 
 // NewService creates new service with provided parameters.
-func NewService(parameters ServiceParameters) *Service {
+func NewService(parameters Parameters) *Service {
 	return &Service{
-		MasterDatabase:  parameters.MasterDatabase,
-		SlaveDatabase: parameters.SlaveDatabase,
+		Leader:  parameters.Leader,
+		Follower: parameters.Leader,
 	}
 }
 ```
@@ -402,18 +412,20 @@ type ServiceParameter struct {
 }
 ```
 
-### Fill struct
+### Struct field injection
 
 To avoid constant constructor changes, you can use `di.Inject`. Only
 struct pointers are supported as constructing result. And only 
-`di`-taged fields will be injected.
+`di`-taged fields will be injected. Such a constructor will work with 
+using `di` only.
 
 ```go
 // Controller has some endpoints.
 type Controller struct {
-    di.Inject
+    di.Inject // enables struct field injection 
 
-    // fields must be public
+    // fields must be public and have tag di
+    // tag lets to specify fields need to be injected
     Users   UserService     `di:""`
     Friends FriendsService  `di:""`
 }
@@ -423,8 +435,6 @@ func NewController() *Controller {
     return &Controller{}
 }
 ```
-
-> Note such constructor will not be working without `di` library.
 
 ### Prototypes
 
