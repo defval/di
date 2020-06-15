@@ -12,13 +12,15 @@ extensible.
 
 ## Features
 
-- **Autowiring**
-- **Type groups**
-- **Interface binding**
-- **Named definitions**
-- **Functional options API**
-- **Optional dependencies**
-- **Cleanup**
+- Intuitive auto wiring based on go type system
+- Interface implementations specification
+- Same type groups for iteration
+- Cleanup constructed instances
+- Functional option interface
+- Struct field injection
+- Optional injection
+- Type lazy-loading
+- Named types
 
 ## Contents
 
@@ -478,16 +480,3 @@ if err != nil {
 // do something
 container.Cleanup() // file was closed
 ```
-
-## Comparison
-
-|                               | **goava/di** | google/wire | uber-go/dig | sarulabs/di |
-|-------------------------------|     :---:    |    :---:    |    :---:    |    :---:    |
-| **Autowiring**                |     ➕       |      ➕      |      ➕     |      ➖     |
-| **Type groups**               |     ➕       |      ➖      |  Struct tag |     Tag     |
-| **Interface binding**         |     ➕       |      ➕      |      ➖     |      ➖      |
-| **Named definitions**         |     ➕       |      ➖      |      ➕     |      ➕      |
-| **Functional options API**    |     ➕       |      ➖      |      ➖     |      ➖      |
-| **Optional dependencies**     |     ➕       |      ➖      |      ➕     |              |
-| **Cleanup**                   |     ➕       |      ➕      |      ➖     |      ➕      |
-| Reflection based              |     ➕       |      ➖      |      ➕     |      ➕      |
