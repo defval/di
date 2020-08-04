@@ -8,7 +8,7 @@ DI
 
 Dependency injection for Go programming language.
 
-[Tutorial](./docs/tutorial.md) | [Advanced features](./docs/advanced.md)
+[Tutorial](./docs/tutorial.md) | [Examples](./_examples) | [Advanced features](./docs/advanced.md)
 
 Dependency injection is one form of the broader technique of inversion
 of control. It is used to increase modularity of the program and make it
