@@ -248,4 +248,4 @@ func NewServeMux(controllers []Controller) *http.ServeMux {
 }
 ```
 
-The full tutorial code is available [here](./_examples/tutorial/main.go)
+The full tutorial code is available [here](./../_examples/tutorial/main.go)
