@@ -9,7 +9,8 @@
 
 ### Modules
 
-You can group previous options into single variable by using `di.Options()` :
+You can group previous options into single variable by using
+`di.Options()` :
 
 ```go
 // account module
@@ -34,8 +35,9 @@ if err != nil {
 
 ### Named definitions
 
-If you have more than one instances of same type, you can specify alias. For example
-two instances of database: leader - for writing, follower - for reading.
+If you have more than one instances of same type, you can specify alias.
+For example two instances of database: leader - for writing, follower -
+for reading.
 
 #### Wrap type into another unique type
 
@@ -60,7 +62,8 @@ di.Provide(NewLeader, di.WithName("leader"))
 di.Provide(NewFollower, di.WithName("follower"))
 ```
 
-If you need to resolve it from the container use `di.Name()` *resolve option*.
+If you need to resolve it from the container use `di.Name()` *resolve
+option*.
 
 ```go
 var db *Database
@@ -91,8 +94,8 @@ func NewService(parameters Parameters) *Service {
 
 ### Optional parameters
 
-Also, `di.Inject` with tag `optional` provide ability to skip dependency if it not exists
-in the container.
+Also, `di.Inject` with tag `optional` provide ability to skip dependency
+if it not exists in the container.
 
 ```go
 // ServiceParameter
@@ -121,8 +124,8 @@ type ServiceParameter struct {
 ### Struct fields injection
 
 To avoid constant constructor changes, you can use `di.Inject`. Only
-struct pointers are supported as constructing result. And only 
-`di`-taged fields will be injected. Such a constructor will work with 
+struct pointers are supported as constructing result. And only
+`di`-taged fields will be injected. Such a constructor will work with
 using `di` only.
 
 ```go
@@ -141,7 +144,7 @@ func NewController() *Controller {
     return &Controller{}
 }
 ```
-
+d
 ### Prototypes
 
 Use `di.Prototype()` option to create new instance for each resolve.
@@ -152,8 +155,8 @@ di.Provide(NewRequestContext, di.Prototype())
 
 ### Cleanup
 
-If the constructor creates a value that needs to be cleaned up, then it can
-return a closure to clean up the resource.
+If the constructor creates a value that needs to be cleaned up, then it
+can return a closure to clean up the resource.
 
 ```go
 func NewFile(log Logger, path Path) (*os.File, func(), error) {
@@ -184,3 +187,4 @@ if err != nil {
 // do something
 container.Cleanup() // file was closed
 ```
+

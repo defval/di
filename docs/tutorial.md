@@ -3,7 +3,8 @@
 Let's learn to use `di` by example. We will code a simple application
 that processes HTTP requests.
 
-The full tutorial code is available [here](./../_examples/tutorial/main.go).
+The full tutorial code is available
+[here](./../_examples/tutorial/main.go).
 
 - [Provide](#provide)
 - [Resolve](#resolve)
@@ -14,8 +15,9 @@ The full tutorial code is available [here](./../_examples/tutorial/main.go).
 
 ### Provide
 
-To start, we will need to provide way to build for two fundamental types: `http.Server`
-and `http.ServeMux`. Let's create a simple functional constructors that build them:
+To start, we will need to provide way to build for two fundamental
+types: `http.Server` and `http.ServeMux`. Let's create a simple
+functional constructors that build them:
 
 ```go
 // NewServer builds a http server with provided mux as handler.
@@ -55,8 +57,8 @@ if err != nil {
 
 ### Resolve
 
-Next we can resolve the built server from the container. For this define the
-variable of resolved type and pass variable pointer to `Resolve`
+Next we can resolve the built server from the container. For this define
+the variable of resolved type and pass variable pointer to `Resolve`
 function.
 
 If no error occurred we can use the variable.
@@ -73,13 +75,14 @@ if err != nil {
 server.ListenAndServe()
 ```
 
-> Note, by default the container creates singletons.
-> But you can change this behaviour. See [Prototypes](.#prototypes).
+> Note, by default the container creates singletons. But you can change
+> this behaviour. See [Prototypes](.#prototypes).
 
 ### Invoke
 
-As an alternative to resolve we can use `Invoke()` function of `Container`. It builds
-dependencies and calls provided function. Invoke function can return optional error.
+As an alternative to resolve we can use `Invoke()` function of
+`Container`. It builds dependencies and calls provided function. Invoke
+function can return optional error.
 
 ```go
 // StartServer starts the server.
@@ -92,7 +95,8 @@ if err := container.Invoke(StartServer); err != nil {
 }
 ```
 
-Also you can use `di.Invoke()` container options for call some initialization code.
+Also you can use `di.Invoke()` container options for call some
+initialization code.
 
 ```go
 container, err := di.New(
@@ -104,8 +108,8 @@ if err != nil {
 }
 ```
 
-The container runs all `invoke functions` on the compile stage in the order they were declared. If one of then fails, the
-compilation fails.
+The container runs all `invoke functions` on the compile stage in the
+order they were declared. If one of then fails, the compilation fails.
 
 ### Lazy-loading
 
@@ -115,7 +119,8 @@ the container it won't be constructed.
 ### Interfaces
 
 You can provide implementation as an interface. Use `di.As()` for it.
-The arguments of this option must be a pointer(s) to an interface like `new(http.Handler)`.
+The arguments of this option must be a pointer(s) to an interface like
+`new(http.Handler)`.
 
 ```go
 di.Provide(NewServeMux, di.As(new(http.Handler)))
@@ -149,18 +154,20 @@ if err != nil {
 }
 ```
 
-Now container use `*http.ServeMux` as implementation of `http.Handler`. 
+Now container use `*http.ServeMux` as implementation of `http.Handler`.
 Interaface usage contributes to write more testable code.
 
 ### Groups
 
 ##### Grouping
 
-Container automatically groups the same types to `[]<type>` slice. It works with `di.As()` too.
-For example, `di.As(new(http.Handler)` automatically creates a group
-`[]http.Handler`.
+Container automatically groups the same types to `[]<type>` slice. It
+works with `di.As()` too. For example, `di.As(new(http.Handler)`
+automatically creates a group `[]http.Handler`.
 
-Let's add some http controllers using this feature. The main function of controllers is registering routes. At first, will create an interface for it.
+Let's add some http controllers using this feature. The main function of
+controllers is registering routes. At first, will create an interface
+for it.
 
 ```go
 // Controller is an interface that can register its routes.
@@ -217,8 +224,8 @@ func (e *UserController) RetrieveUsers(writer http.ResponseWriter, request *http
 
 ##### Container initialization code
 
-Just like in the example with interfaces, we will use `di.As()`
-provide option.
+Just like in the example with interfaces, we will use `di.As()` provide
+option.
 
 ```go
 container, err := di.New(
@@ -248,4 +255,5 @@ func NewServeMux(controllers []Controller) *http.ServeMux {
 }
 ```
 
-The full tutorial code is available [here](./../_examples/tutorial/main.go)
+The full tutorial code is available
+[here](./../_examples/tutorial/main.go)
