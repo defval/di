@@ -14,6 +14,57 @@ import (
 	"github.com/goava/di"
 )
 
+// NewTestContainer
+func NewTestContainer(t *testing.T) *TestContainer {
+	c, err := di.New()
+	require.NoError(t, err)
+	return &TestContainer{t, c}
+}
+
+// TestContainer
+type TestContainer struct {
+	t *testing.T
+	*di.Container
+}
+
+func (c *TestContainer) MustProvide(provider interface{}, as ...di.Interface) {
+	err := c.Provide(provider, di.ProvideParams{Interfaces: as})
+	require.NoError(c.t, err)
+}
+
+func (c *TestContainer) MustResolve(target interface{}) {
+	require.NoError(c.t, c.Resolve(target))
+}
+
+// MustResolvePtr extract value from container into target and check that target and expected pointers are equal.
+func (c *TestContainer) MustResolvePtr(expected, target interface{}) {
+	c.MustResolve(target)
+
+	// indirect
+	actual := reflect.ValueOf(target).Elem().Interface()
+	c.MustEqualPointer(expected, actual)
+}
+
+func (c *TestContainer) MustInvoke(fn interface{}) {
+	require.NoError(c.t, c.Invoke(fn))
+}
+
+func (c *TestContainer) MustEqualPointer(expected interface{}, actual interface{}) {
+	require.Equal(c.t,
+		fmt.Sprintf("%p", actual),
+		fmt.Sprintf("%p", expected),
+		"actual and expected pointers should be equal",
+	)
+}
+
+func (c *TestContainer) MustNotEqualPointer(expected interface{}, actual interface{}) {
+	require.NotEqual(c.t,
+		fmt.Sprintf("%p", actual),
+		fmt.Sprintf("%p", expected),
+		"actual and expected pointers should not be equal",
+	)
+}
+
 func TestContainer_Resolve(t *testing.T) {
 	t.Run("resolve into nil cause error", func(t *testing.T) {
 		c, err := di.New()
@@ -148,7 +199,7 @@ func TestContainer_Resolve_GroupOfTypes(t *testing.T) {
 		require.Equal(t, fmt.Sprintf("%p", conn2), fmt.Sprintf("%p", conns[1]))
 	})
 
-	t.Run("resolve net specific type of group cause error", func(t *testing.T) {
+	t.Run("resolve not specific type of group cause error", func(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)
 		require.NotNil(t, c)
@@ -845,53 +896,68 @@ func TestContainer_Cleanup(t *testing.T) {
 	})
 }
 
-// NewTestContainer
-func NewTestContainer(t *testing.T) *TestContainer {
-	c, err := di.New()
-	require.NoError(t, err)
-	return &TestContainer{t, c}
+type TaggedTypeFoo struct {
+	di.Tags `tagged:"foo"`
 }
 
-// TestContainer
-type TestContainer struct {
-	t *testing.T
-	*di.Container
+type TaggedTypeBar struct {
+	di.Tags `tagged:"bar"`
 }
 
-func (c *TestContainer) MustProvide(provider interface{}, as ...di.Interface) {
-	err := c.Provide(provider, di.ProvideParams{Interfaces: as})
-	require.NoError(c.t, err)
-}
+func TestContainer_ResolveTaggedType(t *testing.T) {
+	t.Run("resolve tagged type", func(t *testing.T) {
+		c := NewTestContainer(t)
+		tcpAddr := &net.TCPAddr{}
+		udpAddr := &net.UDPAddr{}
+		err := c.Provide(
+			func() *net.TCPAddr { return tcpAddr },
+			di.As(new(net.Addr)),
+			di.WithTag("type", "tcp"),
+		)
+		require.NoError(t, err)
+		err = c.Provide(
+			func() *net.UDPAddr { return udpAddr },
+			di.As(new(net.Addr)),
+			di.WithTag("type", "udp"),
+		)
+		require.NoError(t, err)
+		var addr net.Addr
+		err = c.Resolve(&addr, di.Tag("type", "udp"))
+		require.NoError(t, err)
+		c.MustEqualPointer(udpAddr, addr)
+		err = c.Resolve(&addr, di.Tag("type", "tcp"))
+		require.NoError(t, err)
+		c.MustEqualPointer(tcpAddr, addr)
+	})
 
-func (c *TestContainer) MustResolve(target interface{}) {
-	require.NoError(c.t, c.Resolve(target))
-}
+	t.Run("tagged type not found", func(t *testing.T) {
+		c := NewTestContainer(t)
+		tcpAddr := &net.TCPAddr{}
+		err := c.Provide(
+			func() *net.TCPAddr { return tcpAddr },
+			di.As(new(net.Addr)),
+			di.WithTag("type", "tcp"),
+		)
+		require.NoError(t, err)
+		var addr net.Addr
+		err = c.Resolve(&addr, di.Tag("not", "found"))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "container_test.go:")
+		require.Contains(t, err.Error(), "type with tags (not:found) not found")
+	})
 
-// MustResolvePtr extract value from container into target and check that target and expected pointers are equal.
-func (c *TestContainer) MustResolvePtr(expected, target interface{}) {
-	c.MustResolve(target)
-
-	// indirect
-	actual := reflect.ValueOf(target).Elem().Interface()
-	c.MustEqualPointer(expected, actual)
-}
-
-func (c *TestContainer) MustInvoke(fn interface{}) {
-	require.NoError(c.t, c.Invoke(fn))
-}
-
-func (c *TestContainer) MustEqualPointer(expected interface{}, actual interface{}) {
-	require.Equal(c.t,
-		fmt.Sprintf("%p", actual),
-		fmt.Sprintf("%p", expected),
-		"actual and expected pointers should be equal",
-	)
-}
-
-func (c *TestContainer) MustNotEqualPointer(expected interface{}, actual interface{}) {
-	require.NotEqual(c.t,
-		fmt.Sprintf("%p", actual),
-		fmt.Sprintf("%p", expected),
-		"actual and expected pointers should not be equal",
-	)
+	t.Run("resolve type with di.Tags", func(t *testing.T) {
+		c := NewTestContainer(t)
+		type Tagged interface{}
+		foo := &TaggedTypeFoo{}
+		bar := &TaggedTypeBar{}
+		err := c.Provide(func() *TaggedTypeFoo { return foo }, di.As(new(Tagged)))
+		require.NoError(t, err)
+		err = c.Provide(func() *TaggedTypeBar { return bar }, di.As(new(Tagged)))
+		require.NoError(t, err)
+		var tagged Tagged
+		err = c.Resolve(&tagged, di.Tag("tagged", "bar"))
+		require.NoError(t, err)
+		c.MustEqualPointer(bar, tagged)
+	})
 }

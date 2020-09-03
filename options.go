@@ -117,6 +117,16 @@ func WithName(name string) ProvideOption {
 	})
 }
 
+// WithTag adds tag-value specification for provided type.
+func WithTag(key string, value string) ProvideOption {
+	return provideOption(func(params *ProvideParams) {
+		if params.Tags == nil {
+			params.Tags = map[string]string{}
+		}
+		params.Tags[key] = value
+	})
+}
+
 // Prototype modifies Provide() behavior. By default, each type resolves as a singleton. This option sets that
 // each type resolving creates a new instance of the type.
 //
@@ -226,12 +236,24 @@ type CompileOption interface {
 // function. Interfaces is a interface that implements a provider result type.
 type ProvideParams struct {
 	Name        string
+	Tags        map[string]string
 	Interfaces  []Interface
 	IsPrototype bool
 }
 
 func (p ProvideParams) apply(params *ProvideParams) {
 	*params = p
+}
+
+func (p *ProvideParams) mergeTags(tags map[string]string) {
+	for k, v := range tags {
+		if p.Tags == nil {
+			p.Tags = map[string]string{}
+		}
+		if _, ok := p.Tags[k]; !ok {
+			p.Tags[k] = v
+		}
+	}
 }
 
 // InvokeOption is a functional option interface that modify invoke behaviour.
@@ -262,9 +284,20 @@ func Name(name string) ResolveOption {
 	})
 }
 
+// Tag todo: documentation
+func Tag(key string, value string) ResolveOption {
+	return resolveOption(func(params *ResolveParams) {
+		if params.Tags == nil {
+			params.Tags = map[string]string{}
+		}
+		params.Tags[key] = value
+	})
+}
+
 // ResolveParams is a resolve parameters.
 type ResolveParams struct {
 	Name string
+	Tags map[string]string
 }
 
 func (p ResolveParams) apply(params *ResolveParams) {

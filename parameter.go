@@ -27,11 +27,11 @@ func (p parameter) String() string {
 func (p parameter) ResolveProvider(c *Container) (provider, error) {
 	plist, exists := c.providers[p.typ]
 	// only one provider of type
-	if exists && plist.Len() == 1 {
+	if exists && plist.Len() == 1 && p.uniq == "" {
 		return plist.ByIndex(0), nil
 	}
 	if exists && p.uniq != "" {
-		return plist.ByUniq(p.uniq), nil
+		return plist.ByUniq(p.uniq)
 	}
 	// named provider
 	if exists && plist.Len() > 1 {

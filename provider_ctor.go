@@ -3,6 +3,7 @@ package di
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/goava/di/internal/reflection"
 )
@@ -83,6 +84,31 @@ func (c providerConstructor) Name() string {
 // ParameterList returns constructor parameter list.
 func (c *providerConstructor) ParameterList() parameterList {
 	return c.params
+}
+
+func (c *providerConstructor) Tags() map[string]string {
+	rt := c.call.Out(0)
+	if rt.Kind() == reflect.Ptr {
+		rt = rt.Elem()
+	}
+	if rt.Kind() != reflect.Struct {
+		return nil
+	}
+	ft, exists := rt.FieldByName("Tags")
+	if !exists {
+		return nil
+	}
+	fts := string(ft.Tag)
+	tvs := strings.Split(fts, ";")
+	if len(tvs) == 0 {
+		return nil
+	}
+	result := map[string]string{}
+	for _, tv := range tvs {
+		tvlist := strings.Split(tv, ":")
+		result[tvlist[0]] = strings.Replace(tvlist[1], "\"", "", -1)
+	}
+	return result
 }
 
 // Provide provides resultant.

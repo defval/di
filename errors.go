@@ -110,6 +110,14 @@ func (e errHaveSeveralInstances) Error() string {
 	return fmt.Sprintf("%s: could not be resolved: have several instances", e.typ)
 }
 
+type errTaggedTypeNotFound struct {
+	uniq string
+}
+
+func (e errTaggedTypeNotFound) Error() string {
+	return fmt.Sprintf("type with tags (%s) not found", e.uniq)
+}
+
 func bug() {
 	panic("you found a bug, please create new issue for this: https://github.com/goava/di/issues/new")
 }

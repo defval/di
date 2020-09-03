@@ -127,6 +127,7 @@ func (c *Container) provide(constructor Constructor, options ...ProvideOption) e
 	if err != nil {
 		return err
 	}
+	params.mergeTags(p.Tags())
 	cleanup := p.ctorType == ctorCleanup || p.ctorType == ctorCleanupError
 	if cleanup && params.IsPrototype {
 		return fmt.Errorf("cleanup not supported with prototype providers")
@@ -142,18 +143,18 @@ func (c *Container) provide(constructor Constructor, options ...ProvideOption) e
 	if !params.IsPrototype {
 		fp = asSingleton(p)
 	}
-	uniq, err := plist.Add(fp)
+	uniq, err := plist.Add(fp, nil)
 	if err != nil {
 		return err
 	}
 	link := keyUniq{key{fp.Type(), fp.Name()}, uniq}
-	if err := c.processInterfaces(link, params.Interfaces, params.IsPrototype); err != nil {
+	if err := c.processInterfaces(link, params.Interfaces, params.IsPrototype, params.Tags); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *Container) processInterfaces(key keyUniq, interfaces []Interface, isPrototype bool) error {
+func (c *Container) processInterfaces(key keyUniq, interfaces []Interface, isPrototype bool, tags map[string]string) error {
 	// interface raw
 	for _, iraw := range interfaces {
 		// provider interface
@@ -172,7 +173,7 @@ func (c *Container) processInterfaces(key keyUniq, interfaces []Interface, isPro
 		if !isPrototype {
 			fpiface = asSingleton(piface)
 		}
-		_, err = ilist.Add(fpiface)
+		_, err = ilist.Add(fpiface, tags)
 		if err != nil {
 			return err
 		}
@@ -205,7 +206,12 @@ func (c *Container) resolve(into interface{}, options ...ResolveOption) error {
 	for _, opt := range options {
 		opt.apply(&params)
 	}
+	uniq := ""
+	if params.Tags != nil {
+		uniq = tagsToString(params.Tags)
+	}
 	param := parameter{
+		uniq: uniq,
 		name: params.Name,
 		typ:  reflect.TypeOf(into).Elem(),
 	}

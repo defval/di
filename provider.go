@@ -3,6 +3,7 @@ package di
 import (
 	"fmt"
 	"reflect"
+	"strings"
 )
 
 // provider is a internal provider interface.
@@ -36,13 +37,17 @@ type providerList struct {
 
 // Add adds provider to list and return uniq identifier. If named provider already
 // exists in list returns error.
-func (l *providerList) Add(p provider) (string, error) {
+func (l *providerList) Add(p provider, tags map[string]string) (string, error) {
 	for _, prov := range l.providers {
 		if p.Name() != "" && p.Name() == prov.Name() {
 			return "", fmt.Errorf("%s with name %s already exists, use another name", p.Type(), p.Name())
 		}
 	}
 	uniq := randomString(32)
+	if tags != nil {
+		// identity=foo:value;bar:value
+		uniq = uniq + "=" + tagsToString(tags)
+	}
 	l.order = append(l.order, uniq)
 	l.providers[uniq] = p
 	return uniq, nil
@@ -75,8 +80,13 @@ func (l providerList) ByIndex(index int) provider {
 	return l.providers[l.order[index]]
 }
 
-func (l providerList) ByUniq(uniq string) provider {
-	return l.providers[uniq]
+func (l providerList) ByUniq(uniq string) (provider, error) {
+	for providerUniq := range l.providers {
+		if strings.Contains(providerUniq, uniq) {
+			return l.providers[providerUniq], nil
+		}
+	}
+	return nil, errTaggedTypeNotFound{uniq}
 }
 
 func findNamedProvider(plist *providerList, param parameter) (result provider, _ error) {
