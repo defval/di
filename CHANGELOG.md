@@ -5,9 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this
 project adheres to
-[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html): TBD, use modules or another vendor system.
 
-<!--## [Unrealeased]-->
+## UNRELEASED: A release that doesn't deserve to be called `v2`
+
+### BREAKING CHANGES
+
+- Provide duplications allowed.
+- Removed tag `di`. Now all public fields in injectable type will be injected.
+- Resolving node without tags, now returns all nodes of this type.
+- Now, `di:"type_name"` is a `name:"type_name"`.
+- Removed `di.Prototype()`: bad practice.
+
+### Added
+
+- Tagging that allows specifying key value identity for types.
+- `skip:"true"` field tag option, that skips field providing.
+
+### Fixed
+
+- A bit of bad code
 
 ## v1.2.1
 

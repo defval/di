@@ -50,7 +50,7 @@ type Constructor interface{}
 
 // ProvideOption is a functional option interface that modify provide behaviour. See di.As(), di.WithName().
 type ProvideOption interface {
-	apply(params *ProvideParams)
+	applyProvide(params *ProvideParams)
 }
 
 // As returns provide option that specifies interfaces for constructor resultant type.
@@ -111,32 +111,13 @@ func As(interfaces ...Interface) ProvideOption {
 type Interface interface{}
 
 // WithName modifies Provide() behavior. It adds name identity for provided type.
+// Deprecated: use di.Tags.
 func WithName(name string) ProvideOption {
 	return provideOption(func(params *ProvideParams) {
-		params.Name = name
-	})
-}
-
-// Prototype modifies Provide() behavior. By default, each type resolves as a singleton. This option sets that
-// each type resolving creates a new instance of the type.
-//
-//		container, err := di.New(
-// 			Provide(NewHTTPServer, inject.Prototype())
-//		)
-//		if err != nil {
-//			// handle error
-//		}
-// 		var server1, server2 *http.Server
-// 		if err := container.Resolve(&server1); err != nil {
-//			// handle error
-//		}
-//		if err := container.Resolve(&server2); err != nil {
-//			// handle error
-//		}
-//
-func Prototype() ProvideOption {
-	return provideOption(func(params *ProvideParams) {
-		params.IsPrototype = true
+		if params.Tags == nil {
+			params.Tags = Tags{}
+		}
+		params.Tags["name"] = name
 	})
 }
 
@@ -166,17 +147,6 @@ func Invoke(fn Invocation, options ...InvokeOption) Option {
 		})
 	})
 }
-
-// Invocation is a function whose signature looks like:
-//
-//		func StartServer(server *http.Server) error {
-//			return server.ListenAndServe()
-//		}
-//
-// Like a constructor invocation may have unlimited count of arguments and
-// they will be resolved automatically. The invocation can return an optional error.
-// Error will be returned as is.
-type Invocation interface{}
 
 // Options group together container options.
 //
@@ -210,27 +180,14 @@ func WithLogger(logger Logger) Option {
 	})
 }
 
-// WithCompile ejects compile stage.
-// Deprecated: Compile deprecated: https://github.com/goava/di/pull/9
-func WithCompile() Option {
-	return option(func(c *Container) {})
-}
-
-// CompileOption modifies compile behaviour.
-// Deprecated: Compile deprecated: https://github.com/goava/di/pull/9
-type CompileOption interface {
-	apply(c *Container)
-}
-
 // ProvideParams is a Provide() method options. Name is a unique identifier of type instance. Provider is a constructor
 // function. Interfaces is a interface that implements a provider result type.
 type ProvideParams struct {
-	Name        string
-	Interfaces  []Interface
-	IsPrototype bool
+	Tags       Tags
+	Interfaces []Interface
 }
 
-func (p ProvideParams) apply(params *ProvideParams) {
+func (p ProvideParams) applyProvide(params *ProvideParams) {
 	*params = p
 }
 
@@ -251,23 +208,27 @@ func (p InvokeParams) apply(params *InvokeParams) {
 
 // ResolveOption is a functional option interface that modify resolve behaviour.
 type ResolveOption interface {
-	apply(params *ResolveParams)
+	applyResolve(params *ResolveParams)
 }
 
 // Name specifies provider string identity. It needed when you have more than one
 // definition of same type. You can identity type by name.
+// Deprecated: use di.Tags
 func Name(name string) ResolveOption {
 	return resolveOption(func(params *ResolveParams) {
-		params.Name = name
+		if params.Tags == nil {
+			params.Tags = Tags{}
+		}
+		params.Tags["name"] = name
 	})
 }
 
 // ResolveParams is a resolve parameters.
 type ResolveParams struct {
-	Name string
+	Tags Tags
 }
 
-func (p ResolveParams) apply(params *ResolveParams) {
+func (p ResolveParams) applyResolve(params *ResolveParams) {
 	*params = p
 }
 
@@ -277,13 +238,13 @@ func (o option) apply(c *Container) { o(c) }
 
 type provideOption func(params *ProvideParams)
 
-func (o provideOption) apply(params *ProvideParams) {
+func (o provideOption) applyProvide(params *ProvideParams) {
 	o(params)
 }
 
 type resolveOption func(params *ResolveParams)
 
-func (o resolveOption) apply(params *ResolveParams) {
+func (o resolveOption) applyResolve(params *ResolveParams) {
 	o(params)
 }
 

@@ -3,14 +3,14 @@ package di
 import (
 	"fmt"
 	"reflect"
-
-	"github.com/goava/di/internal/reflection"
 )
 
 // Container is a dependency injection container.
 type Container struct {
 	// Logger that logs internal actions.
 	logger Logger
+	// Dependency injection schema.
+	schema *defaultSchema
 	// Initial options will be processed on di.New().
 	initial struct {
 		// Array of di.Provide() options.
@@ -20,12 +20,10 @@ type Container struct {
 		// Array of di.Resolve() options.
 		resolves []resolveOptions
 	}
-	// Mapping from key to provider that can provide value for that key.
-	providers map[reflect.Type]*providerList
 	// Array of provider cleanups.
 	cleanups []func()
 	// Flag indicates acyclic verification state
-	verified map[key]bool
+	//verified map[key]bool
 }
 
 // New constructs container with provided options. Example usage (simplified):
@@ -58,19 +56,18 @@ type Container struct {
 //	}
 func New(options ...Option) (_ *Container, err error) {
 	c := &Container{
-		logger:    nopLogger{},
-		providers: map[reflect.Type]*providerList{},
-		cleanups:  []func(){},
-		verified:  map[key]bool{},
+		logger:   nopLogger{},
+		schema:   newDefaultSchema(),
+		cleanups: []func(){},
 	}
 	// apply container options
 	for _, opt := range options {
 		opt.apply(c)
 	}
-	// process di.Provide() options
+	// process di.Resolve() options
 	for _, provide := range c.initial.provides {
 		if err := c.provide(provide.constructor, provide.options...); err != nil {
-			return nil, ErrProvideFailed{
+			return nil, errProvideFailed{
 				provide.frame,
 				err,
 			}
@@ -83,8 +80,8 @@ func New(options ...Option) (_ *Container, err error) {
 	// process di.Invoke() options
 	for _, invoke := range c.initial.invokes {
 		err := c.invoke(invoke.fn, invoke.options...)
-		if err != nil && isUsageError(err) {
-			return nil, ErrInvokeFailed{invoke.frame, err}
+		if err != nil && knownError(err) {
+			return nil, errInvokeFailed{invoke.frame, err}
 		}
 		if err != nil {
 			return nil, err
@@ -93,7 +90,7 @@ func New(options ...Option) (_ *Container, err error) {
 	// process di.Resolve() options
 	for _, resolve := range c.initial.resolves {
 		if err := c.resolve(resolve.target, resolve.options...); err != nil {
-			return nil, ErrResolveFailed{resolve.frame, err}
+			return nil, errResolveFailed{resolve.frame, err}
 		}
 	}
 	return c, nil
@@ -113,72 +110,44 @@ func (c *Container) provide(constructor Constructor, options ...ProvideOption) e
 	if constructor == nil {
 		return fmt.Errorf("invalid constructor signature, got nil")
 	}
-	fn, valid := reflection.InspectFunc(constructor)
+	fn, valid := inspectFunction(constructor)
 	if !valid {
 		return fmt.Errorf("invalid constructor signature, got %s", reflect.TypeOf(constructor))
 	}
 	params := ProvideParams{}
 	// apply provide options
 	for _, opt := range options {
-		opt.apply(&params)
+		opt.applyProvide(&params)
 	}
-	// create constructor provider
-	p, err := newProviderConstructor(params.Name, fn)
+	n, err := nodeFromFunction(fn)
 	if err != nil {
 		return err
 	}
-	cleanup := p.ctorType == ctorCleanup || p.ctorType == ctorCleanupError
-	if cleanup && params.IsPrototype {
-		return fmt.Errorf("cleanup not supported with prototype providers")
+	for k, v := range params.Tags {
+		n.tags[k] = v
 	}
-	// provider list
-	plist, ok := c.providers[p.Type()]
-	if !ok {
-		// create list of providers
-		plist = createProviderList()
-		c.providers[p.Type()] = plist
-	}
-	fp := provider(p)
-	if !params.IsPrototype {
-		fp = asSingleton(p)
-	}
-	uniq, err := plist.Add(fp)
-	if err != nil {
-		return err
-	}
-	link := keyUniq{key{fp.Type(), fp.Name()}, uniq}
-	if err := c.processInterfaces(link, params.Interfaces, params.IsPrototype); err != nil {
-		return err
+	c.schema.register(n)
+	// register interfaces
+	for _, cur := range params.Interfaces {
+		i, err := inspectInterfacePointer(cur)
+		if err != nil {
+			return err
+		}
+		if !n.rt.Implements(i.Type) {
+			return fmt.Errorf("%s not implement %s", n, i.Type)
+		}
+		c.schema.register(&node{
+			rv:       n.rv,
+			rt:       i.Type,
+			tags:     n.tags,
+			compiler: n.compiler,
+		})
+		return nil
 	}
 	return nil
 }
 
-func (c *Container) processInterfaces(key keyUniq, interfaces []Interface, isPrototype bool) error {
-	// interface raw
-	for _, iraw := range interfaces {
-		// provider interface
-		piface, err := newProviderInterface(key.uniq, key.key, iraw)
-		if err != nil {
-			return err
-		}
-		// interface list
-		ilist, ok := c.providers[piface.Type()]
-		if !ok {
-			ilist = createProviderList()
-			c.providers[piface.Type()] = ilist
-
-		}
-		fpiface := provider(piface)
-		if !isPrototype {
-			fpiface = asSingleton(piface)
-		}
-		_, err = ilist.Add(fpiface)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
+type Pointer interface{}
 
 // Resolve resolves type and fills target pointer.
 //
@@ -186,43 +155,38 @@ func (c *Container) processInterfaces(key keyUniq, interfaces []Interface, isPro
 //	if err := container.Resolve(&server); err != nil {
 //		// handle error
 //	}
-func (c *Container) Resolve(into interface{}, options ...ResolveOption) error {
-	if err := c.resolve(into, options...); err != nil {
+func (c *Container) Resolve(ptr Pointer, options ...ResolveOption) error {
+	if err := c.resolve(ptr, options...); err != nil {
 		return resolveErrWithStack(err)
 	}
 	return nil
 }
 
-func (c *Container) resolve(into interface{}, options ...ResolveOption) error {
-	if into == nil {
+func (c *Container) resolve(ptr Pointer, options ...ResolveOption) error {
+	if ptr == nil {
 		return fmt.Errorf("resolve target must be a pointer, got nil")
 	}
-	if reflect.ValueOf(into).Kind() != reflect.Ptr {
-		return fmt.Errorf("resolve target must be a pointer, got %s", reflect.TypeOf(into))
+	if reflect.ValueOf(ptr).Kind() != reflect.Ptr {
+		return fmt.Errorf("resolve target must be a pointer, got %s", reflect.TypeOf(ptr))
 	}
 	params := ResolveParams{}
 	// apply extract options
 	for _, opt := range options {
-		opt.apply(&params)
+		opt.applyResolve(&params)
 	}
-	param := parameter{
-		name: params.Name,
-		typ:  reflect.TypeOf(into).Elem(),
-	}
-	// check cycle verified
-	if !c.verified[param.Key()] {
-		err := checkCycles(c, param)
-		if err != nil {
-			return err
-		}
-		c.verified[param.Key()] = true
-	}
-	value, err := param.ResolveValue(c)
+	node, err := c.schema.find(reflect.TypeOf(ptr).Elem(), params.Tags)
 	if err != nil {
 		return err
 	}
-	targetValue := reflect.ValueOf(into).Elem()
-	targetValue.Set(value)
+	if err := prepare(c.schema, node); err != nil {
+		return err
+	}
+	value, err := node.Value(c.schema)
+	if err != nil {
+		return fmt.Errorf("%s: %w", node, err)
+	}
+	target := reflect.ValueOf(ptr).Elem()
+	target.Set(value)
 	return nil
 }
 
@@ -230,7 +194,7 @@ func (c *Container) resolve(into interface{}, options ...ResolveOption) error {
 // And invokes function with them. See Invocation for details.
 func (c *Container) Invoke(invocation Invocation, options ...InvokeOption) error {
 	err := c.invoke(invocation, options...)
-	if err != nil && isUsageError(err) {
+	if err != nil && knownError(err) {
 		return invokeErrWithStack(err)
 	}
 	if err != nil {
@@ -247,38 +211,33 @@ func (c *Container) invoke(invocation Invocation, _ ...InvokeOption) error {
 	if invocation == nil {
 		return errInvalidInvocation{fmt.Errorf("invalid invocation signature, got %s", "nil")}
 	}
-	fn, isFn := reflection.InspectFunc(invocation)
-	if !isFn {
+	fn, valid := inspectFunction(invocation)
+	if !valid {
 		return errInvalidInvocation{fmt.Errorf("invalid invocation signature, got %s", fn.Type)}
 	}
 	if !validateInvocation(fn) {
 		return errInvalidInvocation{fmt.Errorf("invalid invocation signature, got %s", fn.Type)}
 	}
-	var plist parameterList
-	for j := 0; j < fn.NumIn(); j++ {
-		param := parameter{
-			typ:      fn.In(j),
-			optional: false,
-		}
-		// check cycle verified
-		if !c.verified[param.Key()] {
-			err := checkCycles(c, param)
-			if err != nil {
-				return errInvalidInvocation{err}
-			}
-			c.verified[param.Key()] = true
-		}
-		plist = append(plist, param)
-	}
-	values, err := plist.Resolve(c)
+	nodes, err := getFunctionNodes(fn, c.schema)
 	if err != nil {
-		return err
+		return errInvalidInvocation{err}
 	}
-	results := reflection.CallResult(fn.Call(values))
-	if len(results) == 0 {
+	var args []reflect.Value
+	for _, node := range nodes {
+		if err := prepare(c.schema, node); err != nil {
+			return errInvalidInvocation{err}
+		}
+		v, err := node.Value(c.schema)
+		if err != nil {
+			return errInvalidInvocation{err}
+		}
+		args = append(args, v)
+	}
+	res := funcOut(fn.Call(args))
+	if len(res) == 0 {
 		return nil
 	}
-	return results.Error(0)
+	return res.error(0)
 }
 
 // Has checks that type exists in container, if not it return false.
@@ -296,31 +255,19 @@ func (c *Container) Has(into interface{}, options ...ResolveOption) bool {
 	params := ResolveParams{}
 	// apply options
 	for _, opt := range options {
-		opt.apply(&params)
+		opt.applyResolve(&params)
 	}
-	typ := reflect.TypeOf(into)
-	param := parameter{
-		name: params.Name,
-		typ:  typ.Elem(),
-	}
-	_, err := param.ResolveProvider(c)
-	if err == nil {
-		return true
-	}
-	if _, ok := err.(errParameterProviderNotFound); ok {
+
+	typ := reflect.TypeOf(into).Elem()
+	if _, err := c.schema.find(typ, params.Tags); err != nil {
 		return false
 	}
-	bug()
-	return false
+	return true
 }
 
 // Cleanup runs destructors in reverse order that was been created.
 func (c *Container) Cleanup() {
-	for i := len(c.cleanups) - 1; i >= 0; i-- {
-		c.cleanups[i]()
+	for i := len(c.schema.cleanups) - 1; i >= 0; i-- {
+		c.schema.cleanups[i]()
 	}
 }
-
-// Compile compiles the container.
-// Deprecated: Compile deprecated: https://github.com/goava/di/pull/9
-func (c *Container) Compile(_ ...CompileOption) error { return nil }

@@ -55,7 +55,7 @@ func TestOptions(t *testing.T) {
 		require.Nil(t, c)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "options_test.go:")
-		require.Contains(t, err.Error(), ": type string not exists in container")
+		require.Contains(t, err.Error(), ": type string not exists in the container")
 	})
 
 	t.Run("invoke error return as is if not internal error", func(t *testing.T) {
