@@ -265,6 +265,49 @@ func (c *Container) Has(into interface{}, options ...ResolveOption) bool {
 	return true
 }
 
+type Loader func() (interface{}, error)
+
+type IterateFunc func(tags Tags, loader Loader) error
+
+//
+func (c *Container) Iterate(ptr Pointer, fn IterateFunc, options ...ResolveOption) error {
+	if ptr == nil {
+		return fmt.Errorf("iterate target must be a pointer, got nil")
+	}
+	if reflect.ValueOf(ptr).Kind() != reflect.Ptr {
+		return fmt.Errorf("iterate target must be a pointer, got %s", reflect.TypeOf(ptr))
+	}
+	params := ResolveParams{}
+	// apply extract options
+	for _, opt := range options {
+		opt.applyResolve(&params)
+	}
+	node, err := c.schema.find(reflect.TypeOf(ptr).Elem(), params.Tags)
+	if err != nil {
+		return err
+	}
+	if err := prepare(c.schema, node); err != nil {
+		return err
+	}
+	group, ok := node.compiler.(*groupCompiler)
+	if ok {
+		for _, n := range group.matched {
+			err = fn(n.tags, func() (interface{}, error) {
+				v, err := n.Value(c.schema)
+				if err != nil {
+					return nil, err
+				}
+				return v.Interface(), nil
+			})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	return fmt.Errorf("iteration can be used with groups only")
+}
+
 // Cleanup runs destructors in reverse order that was been created.
 func (c *Container) Cleanup() {
 	for i := len(c.schema.cleanups) - 1; i >= 0; i-- {

@@ -420,6 +420,65 @@ func TestContainer_Groups(t *testing.T) {
 	})
 }
 
+func TestContainer_Iterate(t *testing.T) {
+	t.Run("iterates over instances", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		conn1 := &net.TCPConn{}
+		conn2 := &net.TCPConn{}
+		require.NoError(t, c.Provide(func() *net.TCPConn { return conn1 }))
+		require.NoError(t, c.Provide(func() *net.TCPConn { return conn2 }))
+		var iterates []*net.TCPConn
+		var conn []*net.TCPConn
+		iterFn := func(tags di.Tags, loader di.Loader) error {
+			i, err := loader()
+			if err != nil {
+				return err
+			}
+			iterates = append(iterates, i.(*net.TCPConn))
+			return nil
+		}
+		err = c.Iterate(&conn, iterFn)
+		require.NoError(t, err)
+		require.Len(t, iterates, 2)
+		require.Equal(t, iterates[0], conn1)
+		require.Equal(t, iterates[1], conn2)
+	})
+
+	t.Run("iterates over tagged instances", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		conn1 := &net.TCPConn{}
+		conn2 := &net.TCPConn{}
+		require.NoError(t, c.Provide(func() *net.TCPConn { return conn1 }, di.Tags{"conn": "tcp1"}))
+		require.NoError(t, c.Provide(func() *net.TCPConn { return conn2 }, di.Tags{"conn": "tcp2"}))
+		require.NoError(t, c.Provide(func() *net.TCPConn { return &net.TCPConn{} }))
+		var iterates []*net.TCPConn
+		var all []di.Tags
+		var conn []*net.TCPConn
+		iterFn := func(tags di.Tags, loader di.Loader) error {
+			all = append(all, tags)
+			i, err := loader()
+			if err != nil {
+				return err
+			}
+			iterates = append(iterates, i.(*net.TCPConn))
+			return nil
+		}
+		err = c.Iterate(&conn, iterFn, di.Tags{"conn": "*"})
+		require.NoError(t, err)
+		require.Len(t, iterates, 2)
+		require.Equal(t, conn1, iterates[0])
+		require.Equal(t, conn2, iterates[1])
+		require.Equal(t, []di.Tags{
+			{"conn": "tcp1"},
+			{"conn": "tcp2"},
+		}, all)
+	})
+}
+
 func TestContainer_Tags(t *testing.T) {
 	t.Run("resolve named definition", func(t *testing.T) {
 		c, err := di.New()
