@@ -7,7 +7,7 @@ The format is based on
 project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html): TBD, use modules or another vendor system.
 
-## UNRELEASED: A release that doesn't deserve to be called `v2`
+## v1.3.0: A release that doesn't deserve to be called `v2`
 
 ### BREAKING CHANGES
 
