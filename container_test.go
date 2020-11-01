@@ -679,6 +679,22 @@ func TestContainer_Group(t *testing.T) {
 }
 
 func TestContainer_Invoke(t *testing.T) {
+	t.Run("invoke nil", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		err = c.Invoke(nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "container_test.go:")
+		require.Contains(t, err.Error(), ": invalid invocation signature, got nil")
+	})
+	t.Run("invoke invalid function", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		err = c.Invoke(func() *http.Server { return &http.Server{} })
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "container_test.go:")
+		require.Contains(t, err.Error(), ": invalid invocation signature, got func() *http.Server")
+	})
 	t.Run("invocation function with not provided dependency cause error", func(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)

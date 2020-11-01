@@ -3,7 +3,6 @@ package di
 import (
 	"reflect"
 	"strconv"
-	"strings"
 )
 
 var iInjectable = reflect.TypeOf(new(injectable)).Elem()
@@ -40,35 +39,6 @@ type field struct {
 	rt       reflect.Type
 	tags     Tags
 	optional bool
-}
-
-// name:"asd" command:"console space"
-func parseField2(f reflect.StructField) (field, bool) {
-	skip, _ := f.Tag.Lookup("skip")
-	if skip == "true" {
-		return field{}, false
-	}
-	tag := string(f.Tag)
-	kvs := strings.Split(tag, ":")
-	tags := Tags{}
-	if len(kvs) == 0 {
-		return field{}, false
-	}
-	for _, v := range kvs {
-		kv := strings.Split(v, ":")
-		if len(kv) != 2 {
-			continue
-		}
-		k := kv[0]
-		v := strings.Trim(kv[1], "\"")
-		tags[k] = v
-	}
-	optional, _ := f.Tag.Lookup("optional")
-	return field{
-		rt:       f.Type,
-		tags:     tags,
-		optional: optional == "true",
-	}, true
 }
 
 // parseField parses struct field
