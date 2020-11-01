@@ -2,6 +2,7 @@ package di
 
 import (
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -41,14 +42,14 @@ type field struct {
 	optional bool
 }
 
-// `name:"asd" command:"console"`
-func parseField(f reflect.StructField) (field, bool) {
+// name:"asd" command:"console space"
+func parseField2(f reflect.StructField) (field, bool) {
 	skip, _ := f.Tag.Lookup("skip")
 	if skip == "true" {
 		return field{}, false
 	}
 	tag := string(f.Tag)
-	kvs := strings.Split(tag, " ")
+	kvs := strings.Split(tag, ":")
 	tags := Tags{}
 	if len(kvs) == 0 {
 		return field{}, false
@@ -67,5 +68,64 @@ func parseField(f reflect.StructField) (field, bool) {
 		rt:       f.Type,
 		tags:     tags,
 		optional: optional == "true",
+	}, true
+}
+
+// parseField parses struct field
+func parseField(f reflect.StructField) (field, bool) {
+	tags := Tags{}
+	t := string(f.Tag)
+	// this code copied from reflect.StructField.Lookup() method.
+	for t != "" {
+		// Skip leading space.
+		i := 0
+		for i < len(t) && t[i] == ' ' {
+			i++
+		}
+		t = t[i:]
+		if t == "" {
+			break
+		}
+
+		// Scan to colon. A space, a quote or a control character is a syntax error.
+		// Strictly speaking, control chars include the range [0x7f, 0x9f], not just
+		// [0x00, 0x1f], but in practice, we ignore the multi-byte control characters
+		// as it is simpler to inspect the tag's bytes than the tag's runes.
+		i = 0
+		for i < len(t) && t[i] > ' ' && t[i] != ':' && t[i] != '"' && t[i] != 0x7f {
+			i++
+		}
+		if i == 0 || i+1 >= len(t) || t[i] != ':' || t[i+1] != '"' {
+			break
+		}
+		name := string(t[:i])
+		t = t[i+1:]
+
+		// Scan quoted string to find value.
+		i = 1
+		for i < len(t) && t[i] != '"' {
+			if t[i] == '\\' {
+				i++
+			}
+			i++
+		}
+		if i >= len(t) {
+			break
+		}
+		qvalue := string(t[:i+1])
+		t = t[i+1:]
+		value, err := strconv.Unquote(qvalue)
+		if err != nil {
+			break
+		}
+		if name == "skip" && value == "true" {
+			return field{}, false
+		}
+		tags[name] = value
+	}
+	return field{
+		rt:       f.Type,
+		tags:     tags,
+		optional: tags["optional"] == "true",
 	}, true
 }
