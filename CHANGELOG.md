@@ -7,6 +7,12 @@ The format is based on
 project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html): TBD, use modules or another vendor system.
 
+## v1.3.1
+
+### Fixed
+
+- Bug: Resolve type as interface causes type reinitialization.
+
 ## v1.3.0: A release that doesn't deserve to be called `v2`
 
 ### BREAKING CHANGES

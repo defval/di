@@ -325,6 +325,18 @@ func TestContainer_Interfaces(t *testing.T) {
 		require.Contains(t, err.Error(), "container_test.go:")
 		require.Contains(t, err.Error(), ": multiple definitions of *http.ServeMux, maybe you need to use group type: []*http.ServeMux")
 	})
+
+	t.Run("resolve same pointer on resolve", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		require.NoError(t, c.Provide(func() *http.ServeMux { return &http.ServeMux{} }, di.As(new(http.Handler))))
+		var server *http.ServeMux
+		require.NoError(t, c.Resolve(&server))
+		var handler http.Handler
+		require.NoError(t, c.Resolve(&handler))
+		require.Equal(t, fmt.Sprintf("%p", server), fmt.Sprintf("%p", handler))
+	})
 }
 
 func TestContainer_Groups(t *testing.T) {

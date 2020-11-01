@@ -7,7 +7,7 @@ import (
 
 // node is a dependency injection node.
 type node struct {
-	rv   reflect.Value
+	rv   *reflect.Value
 	rt   reflect.Type
 	tags Tags
 	compiler
@@ -42,6 +42,7 @@ func nodeFromFunction(fn function) (*node, error) {
 		}
 	}
 	return &node{
+		rv:       &reflect.Value{},
 		rt:       rt,
 		tags:     tags,
 		compiler: cmp,
@@ -55,8 +56,8 @@ func (n *node) String() string {
 
 // Build builds value of node.
 func (n *node) Value(s schema) (reflect.Value, error) {
-	if n.rv.IsValid() {
-		return n.rv, nil
+	if n.rv != nil && n.rv.IsValid() {
+		return *n.rv, nil
 	}
 	nodes, err := n.params(s)
 	if err != nil {
@@ -74,7 +75,7 @@ func (n *node) Value(s schema) (reflect.Value, error) {
 	if err != nil {
 		return reflect.Value{}, err
 	}
-	n.rv = rv
+	*n.rv = rv
 	if err := n.populate(s); err != nil {
 		return reflect.Value{}, err
 	}
@@ -86,7 +87,7 @@ func (n *node) fields() map[int]field {
 	if !isInjectable(rt) {
 		return nil
 	}
-	rv := n.rv
+	rv := *n.rv
 	if !rv.IsValid() {
 		switch rt.Kind() {
 		case reflect.Ptr:
@@ -125,7 +126,7 @@ func (n *node) fields() map[int]field {
 
 // populate populates node fields.
 func (n *node) populate(s schema) error {
-	iv := n.rv
+	iv := *n.rv
 	for i, field := range n.fields() {
 		if iv.Kind() == reflect.Ptr {
 			iv = iv.Elem()

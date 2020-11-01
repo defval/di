@@ -64,6 +64,7 @@ func (s *defaultSchema) find(t reflect.Type, tags Tags) (*node, error) {
 			return nil, fmt.Errorf("inject %s%s fields not supported, use %s%s", t, tags, t.Elem(), tags)
 		}
 		node := &node{
+			rv:       &reflect.Value{},
 			rt:       t,
 			compiler: newTypeCompiler(t),
 		}
@@ -84,6 +85,7 @@ func (s *defaultSchema) group(t reflect.Type, tags Tags) (*node, error) {
 		return nil, fmt.Errorf("%s%s not exists", t, tags)
 	}
 	node := &node{
+		rv:       &reflect.Value{},
 		rt:       t,
 		tags:     tags,
 		compiler: newGroupCompiler(t, matched),
