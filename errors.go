@@ -2,112 +2,74 @@ package di
 
 import (
 	"fmt"
-	"reflect"
 
 	"github.com/goava/di/internal/stacktrace"
 )
 
-// isUsageError return true if err is library usage error.
-func isUsageError(err error) bool {
+// knownError return true if err is library known error.
+func knownError(err error) bool {
 	switch err.(type) {
-	case
-		ErrProvideFailed,
-		ErrResolveFailed,
-		ErrInvokeFailed,
-		errInvalidInvocation,
-		errParameterProviderNotFound,
-		errParameterProvideFailed,
-		errHaveSeveralInstances:
+	case errProvideFailed, errResolveFailed, errInvokeFailed, errInvalidInvocation:
 		return true
 	default:
 		return false
 	}
 }
 
-func provideErrWithStack(err error) ErrProvideFailed {
-	return ErrProvideFailed{stacktrace.CallerFrame(1), err}
+func provideErrWithStack(err error) errProvideFailed {
+	return errProvideFailed{stacktrace.CallerFrame(1), err}
 }
 
-// ErrProvideFailed causes when constructor providing failed.
-type ErrProvideFailed struct {
+func invokeErrWithStack(err error) errInvokeFailed {
+	return errInvokeFailed{stacktrace.CallerFrame(1), err}
+}
+
+// errProvideFailed causes when constructor providing failed.
+type errProvideFailed struct {
 	frame stacktrace.Frame
 	err   error
 }
 
 // Error returns error string.
-func (e ErrProvideFailed) Error() string {
+func (e errProvideFailed) Error() string {
 	return fmt.Sprintf("%s: %s", e.frame, e.err)
 }
 
-func invokeErrWithStack(err error) ErrInvokeFailed {
-	return ErrInvokeFailed{stacktrace.CallerFrame(1), err}
-}
-
-// ErrInvokeFailed causes when invoke failed.
-type ErrInvokeFailed struct {
+// errInvokeFailed causes when invoke failed.
+type errInvokeFailed struct {
 	frame stacktrace.Frame
 	err   error
 }
 
 // Error returns error string.
-func (e ErrInvokeFailed) Error() string {
+func (e errInvokeFailed) Error() string {
 	return fmt.Sprintf("%s: %s", e.frame, e.err)
 }
 
-func resolveErrWithStack(err error) ErrResolveFailed {
-	return ErrResolveFailed{
+func resolveErrWithStack(err error) errResolveFailed {
+	return errResolveFailed{
 		frame: stacktrace.CallerFrame(1),
 		err:   err,
 	}
 }
 
-// ErrResolveFailed causes when type resolve failed.
-type ErrResolveFailed struct {
+// errResolveFailed causes when type resolve failed.
+type errResolveFailed struct {
 	frame stacktrace.Frame
 	err   error
 }
 
 // Error returns error string.
-func (e ErrResolveFailed) Error() string {
+func (e errResolveFailed) Error() string {
 	return fmt.Sprintf("%s: %s", e.frame, e.err)
 }
 
-// errParameterProvideFailed causes when container found a provider but provide failed.
-type errParameterProvideFailed struct {
-	parameter parameter
-	err       error // error
+type errInvalidInvocation struct {
+	err error
 }
 
-// Error is a implementation of error interface.
-func (e errParameterProvideFailed) Error() string {
-	return fmt.Sprintf("%s: %s", e.parameter, e.err)
-}
-
-// errParameterProviderNotFound causes when container could not found a provider for parameter.
-type errParameterProviderNotFound struct {
-	param parameter
-}
-
-// Error is a implementation of error interface.
-func (e errParameterProviderNotFound) Error() string {
-	return fmt.Sprintf("type %s not exists in container", e.param)
-}
-
-type errDependencyNotFound struct {
-	dependant key
-	parameter key
-}
-
-func (e errDependencyNotFound) Error() string {
-	return fmt.Sprintf("%s: dependency %s not exists in container", e.dependant, e.parameter)
-}
-
-type errHaveSeveralInstances struct {
-	typ reflect.Type
-}
-
-func (e errHaveSeveralInstances) Error() string {
-	return fmt.Sprintf("%s: could not be resolved: have several instances", e.typ)
+func (e errInvalidInvocation) Error() string {
+	return e.err.Error()
 }
 
 func bug() {

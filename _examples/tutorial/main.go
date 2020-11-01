@@ -12,19 +12,6 @@ import (
 	"github.com/goava/di"
 )
 
-// StdLogger is a standard logger with implementation via log.
-type StdLogger struct {
-}
-
-// NewStdLogger creates std logger.
-func NewStdLogger() *StdLogger {
-	return &StdLogger{}
-}
-
-func (l *StdLogger) Logf(format string, values ...interface{}) {
-	log.Printf(format, values...)
-}
-
 func main() {
 	c, err := di.New(
 		di.Provide(NewStdLogger, di.As(new(di.Logger))),
@@ -41,6 +28,19 @@ func main() {
 	if err := c.Invoke(StartServer); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// StdLogger is a standard logger with implementation via log.
+type StdLogger struct {
+}
+
+// NewStdLogger creates std logger.
+func NewStdLogger() *StdLogger {
+	return &StdLogger{}
+}
+
+func (l *StdLogger) Logf(format string, values ...interface{}) {
+	log.Printf(format, values...)
 }
 
 // StartServer starts http server.

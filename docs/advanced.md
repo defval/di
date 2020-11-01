@@ -1,7 +1,7 @@
 # Advanced features
 
 - [Modules](#modules)
-- [Named definitions](#named-definitions)
+- [Tags](#tags)
 - [Optional parameters](#optional-parameters)
 - [Struct fields injection](#struct-fields-injection)
 - [Prototypes](#prototypes)
@@ -33,7 +33,7 @@ if err != nil {
 }
 ```
 
-### Named definitions
+### Tags
 
 If you have more than one instances of same type, you can specify alias.
 For example two instances of database: leader - for writing, follower -
@@ -53,21 +53,21 @@ type Follower struct {
 }
 ```
 
-#### Specify name with `di.WithName()` *invoke option*:
+#### Specify tags with `di.Tags` *provide option*:
 
 ```go
 // provide leader database
-di.Provide(NewLeader, di.WithName("leader"))
+di.Provide(NewLeader, di.Tags("type":"leader"})
 // provide follower database
-di.Provide(NewFollower, di.WithName("follower"))
+di.Provide(NewFollower, di.Tags("type", "follower"}))
 ```
 
-If you need to resolve it from the container use `di.Name()` *resolve
+If you need to resolve it from the container use `di.Tags` *resolve
 option*.
 
 ```go
 var db *Database
-container.Resolve(&db, di.Name("leader"))
+container.Resolve(&db, di.Tags{"type": "leader"}))
 ```
 
 If you need to provide named definition in another constructor embed
@@ -78,9 +78,9 @@ If you need to provide named definition in another constructor embed
 type Parameters struct {
 	di.Inject
 	
-	// use `di` tag for the container to know that field need to be injected.
-	Leader *Database `di:"leader"`
-	Follower *Database  `di:"follower"`
+	// use tag for the container to know that field need to be injected.
+	Leader *Database `type:"leader"`
+	Follower *Database  `type:"follower"`
 }
 
 // NewService creates new service with provided parameters.
@@ -92,6 +92,8 @@ func NewService(parameters Parameters) *Service {
 }
 ```
 
+If you need to resolve all types with same tag key, use `*` as tag value.
+
 ### Optional parameters
 
 Also, `di.Inject` with tag `optional` provide ability to skip dependency
@@ -102,22 +104,35 @@ if it not exists in the container.
 type ServiceParameter struct {
 	di.Inject
 	
-	Logger *Logger `di:"" optional:"true"`
+	Logger *Logger `optional:"true"`
 }
 ```
 
 > Constructors that declare dependencies as optional must handle the
 > case of those dependencies being absent.
 
-You can use naming and optional together.
+You can use tagged and optional together.
 
 ```go
 // ServiceParameter
 type ServiceParameter struct {
 	di.Inject
 	
-	StdOutLogger *Logger `di:"stdout"`
-	FileLogger   *Logger `di:"file" optional:"true"`
+	StdOutLogger *Logger `type:"stdout"`
+	FileLogger   *Logger `type:"file" optional:"true"`
+}
+```
+
+If you need to skip fields injection use `skip:"true"` tags for this:
+
+```go
+// ServiceParameter
+type ServiceParameter struct {
+	di.Inject
+	
+	StdOutLogger *Logger    `type:"stdout"`
+	FileLogger   *Logger    `type:"file" optional:"true"`
+	SkipField    *SomeType  `skip:"true"` // injection skipped
 }
 ```
 
@@ -133,24 +148,16 @@ using `di` only.
 type Controller struct {
     di.Inject // enables struct field injection 
 
-    // fields must be public and have tag di
+    // fields must be public
     // tag lets to specify fields need to be injected
-    Users   UserService     `di:""`
-    Friends FriendsService  `di:""`
+    Users   UserService
+    Friends FriendsService  `type:"cached"`
 }
 
 // NewController creates controller.
 func NewController() *Controller {
     return &Controller{}
 }
-```
-d
-### Prototypes
-
-Use `di.Prototype()` option to create new instance for each resolve.
-
-```go
-di.Provide(NewRequestContext, di.Prototype())
 ```
 
 ### Cleanup

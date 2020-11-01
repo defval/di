@@ -28,7 +28,7 @@ behavior without boilerplate.
 - Optional injection
 - Field injection
 - Lazy-loading
-- Named types
+- Tagging
 - Grouping
 - Cleanup
 
@@ -46,6 +46,70 @@ comments. If you do not have experience with auto-wiring libraries as
 ```shell
 go get github.com/goava/di
 ```
+
+## Examples `main.go`
+
+Full code examples [here](./_examples/goway/main.go) and [here](./_examples/tutorial/main.go).
+
+### Without `di`:
+
+```go
+func main() {
+	orders := NewOrderController()
+	users := NewUserController()
+	mux := NewServeMux()
+	mux.HandleFunc("/orders", orders.RetrieveOrders)
+	mux.HandleFunc("/users", users.RetrieveUsers)
+	server := NewServer(mux)
+	log.Println("start server")
+	errChan := make(chan error)
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			errChan <- err
+		}
+	}()
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		stop := make(chan os.Signal)
+		signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
+		<-stop
+		cancel()
+	}()
+	select {
+	case <-ctx.Done():
+		log.Println("stop server")
+		if err := server.Close(); err != nil {
+			log.Fatal(err)
+		}
+	case err := <-errChan:
+		log.Fatal(err)
+	}
+}
+```
+
+### With `di`:
+
+```go
+func main() {
+	c, err := di.New(
+		di.Provide(NewStdLogger, di.As(new(di.Logger))),
+		di.Provide(NewContext),  // provide application context
+		di.Provide(NewServer),   // provide http server
+		di.Provide(NewServeMux), // provide http serve mux
+		// controllers
+		di.Provide(NewOrderController, di.As(new(Controller))), // provide order controller
+		di.Provide(NewUserController, di.As(new(Controller))),  // provide user controller
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := c.Invoke(StartServer); err != nil {
+		log.Fatal(err)
+	}
+}
+```
+
+Full code examples [here](./_examples/goway/main.go) and [here](./_examples/tutorial/main.go).
 
 ## Questions
 
