@@ -183,7 +183,7 @@ func (c *Container) resolve(ptr Pointer, options ...ResolveOption) error {
 	}
 	value, err := node.Value(c.schema)
 	if err != nil {
-		return fmt.Errorf("%s: %w", node, err)
+		return fmt.Errorf("%s: %s", node, err)
 	}
 	target := reflect.ValueOf(ptr).Elem()
 	target.Set(value)
