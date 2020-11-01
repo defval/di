@@ -425,7 +425,7 @@ func TestContainer_Iterate(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)
 		require.NotNil(t, c)
-		err = c.Iterate(nil, func(tags di.Tags, loader di.Loader) error {
+		err = c.Iterate(nil, func(tags di.Tags, loader di.ValueFunc) error {
 			return nil
 		})
 		require.EqualError(t, err, "target must be a pointer, got nil")
@@ -434,7 +434,7 @@ func TestContainer_Iterate(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)
 		require.NotNil(t, c)
-		err = c.Iterate(http.ServeMux{}, func(tags di.Tags, loader di.Loader) error {
+		err = c.Iterate(http.ServeMux{}, func(tags di.Tags, loader di.ValueFunc) error {
 			return nil
 		})
 		require.EqualError(t, err, "target must be a pointer, got http.ServeMux")
@@ -444,7 +444,7 @@ func TestContainer_Iterate(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, c)
 		require.NoError(t, c.Provide(func() http.ServeMux { return http.ServeMux{} }))
-		err = c.Iterate(&http.ServeMux{}, func(tags di.Tags, loader di.Loader) error {
+		err = c.Iterate(&http.ServeMux{}, func(tags di.Tags, loader di.ValueFunc) error {
 			return nil
 		})
 		require.EqualError(t, err, "iteration can be used with groups only")
@@ -459,7 +459,7 @@ func TestContainer_Iterate(t *testing.T) {
 		require.NoError(t, c.Provide(func() *net.TCPConn { return conn2 }))
 		var iterates []*net.TCPConn
 		var conn []*net.TCPConn
-		iterFn := func(tags di.Tags, loader di.Loader) error {
+		iterFn := func(tags di.Tags, loader di.ValueFunc) error {
 			i, err := loader()
 			if err != nil {
 				return err
@@ -486,7 +486,7 @@ func TestContainer_Iterate(t *testing.T) {
 		var iterates []*net.TCPConn
 		var all []di.Tags
 		var conn []*net.TCPConn
-		iterFn := func(tags di.Tags, loader di.Loader) error {
+		iterFn := func(tags di.Tags, loader di.ValueFunc) error {
 			all = append(all, tags)
 			i, err := loader()
 			if err != nil {
@@ -516,7 +516,7 @@ func TestContainer_Iterate(t *testing.T) {
 		require.NoError(t, c.Provide(func() (*net.TCPConn, error) { return conn2, fmt.Errorf("tcp conn 2 error") }))
 		var iterates []*net.TCPConn
 		var conn []*net.TCPConn
-		iterFn := func(tags di.Tags, loader di.Loader) error {
+		iterFn := func(tags di.Tags, loader di.ValueFunc) error {
 			i, err := loader()
 			if err != nil {
 				return err

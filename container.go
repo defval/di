@@ -241,11 +241,24 @@ func (c *Container) Has(target Pointer, options ...ResolveOption) bool {
 	return true
 }
 
-type Loader func() (interface{}, error)
+// ValueFunc is a lazy-loading wrapper for iteration.
+type ValueFunc func() (interface{}, error)
 
-type IterateFunc func(tags Tags, loader Loader) error
+// IterateFunc function that will be called on each instance in iterate selection.
+type IterateFunc func(tags Tags, value ValueFunc) error
 
+// Iterate iterates over group of Pointer type with IterateFunc.
 //
+//  var servers []*http.Server
+//  iterFn := func(tags di.Tags, loader ValueFunc) error {
+//		i, err := loader()
+//		if err != nil {
+//			return err
+//		}
+//		// do stuff with result: i.(*http.Server)
+//		return nil
+//  }
+//  container.Iterate(&servers, iterFn)
 func (c *Container) Iterate(target Pointer, fn IterateFunc, options ...ResolveOption) error {
 	node, err := c.find(target, options...)
 	if err != nil {
