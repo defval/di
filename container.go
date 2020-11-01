@@ -163,22 +163,8 @@ func (c *Container) Resolve(ptr Pointer, options ...ResolveOption) error {
 }
 
 func (c *Container) resolve(ptr Pointer, options ...ResolveOption) error {
-	if ptr == nil {
-		return fmt.Errorf("resolve target must be a pointer, got nil")
-	}
-	if reflect.ValueOf(ptr).Kind() != reflect.Ptr {
-		return fmt.Errorf("resolve target must be a pointer, got %s", reflect.TypeOf(ptr))
-	}
-	params := ResolveParams{}
-	// apply extract options
-	for _, opt := range options {
-		opt.applyResolve(&params)
-	}
-	node, err := c.schema.find(reflect.TypeOf(ptr).Elem(), params.Tags)
+	node, err := c.find(ptr, options...)
 	if err != nil {
-		return err
-	}
-	if err := prepare(c.schema, node); err != nil {
 		return err
 	}
 	value, err := node.Value(c.schema)
@@ -248,18 +234,8 @@ func (c *Container) invoke(invocation Invocation, _ ...InvokeOption) error {
 //	}
 //
 // It like Resolve() but doesn't instantiate a type.
-func (c *Container) Has(into interface{}, options ...ResolveOption) bool {
-	if into == nil {
-		return false
-	}
-	params := ResolveParams{}
-	// apply options
-	for _, opt := range options {
-		opt.applyResolve(&params)
-	}
-
-	typ := reflect.TypeOf(into).Elem()
-	if _, err := c.schema.find(typ, params.Tags); err != nil {
+func (c *Container) Has(target Pointer, options ...ResolveOption) bool {
+	if _, err := c.find(target, options...); err != nil {
 		return false
 	}
 	return true
@@ -270,28 +246,14 @@ type Loader func() (interface{}, error)
 type IterateFunc func(tags Tags, loader Loader) error
 
 //
-func (c *Container) Iterate(ptr Pointer, fn IterateFunc, options ...ResolveOption) error {
-	if ptr == nil {
-		return fmt.Errorf("iterate target must be a pointer, got nil")
-	}
-	if reflect.ValueOf(ptr).Kind() != reflect.Ptr {
-		return fmt.Errorf("iterate target must be a pointer, got %s", reflect.TypeOf(ptr))
-	}
-	params := ResolveParams{}
-	// apply extract options
-	for _, opt := range options {
-		opt.applyResolve(&params)
-	}
-	node, err := c.schema.find(reflect.TypeOf(ptr).Elem(), params.Tags)
+func (c *Container) Iterate(target Pointer, fn IterateFunc, options ...ResolveOption) error {
+	node, err := c.find(target, options...)
 	if err != nil {
-		return err
-	}
-	if err := prepare(c.schema, node); err != nil {
 		return err
 	}
 	group, ok := node.compiler.(*groupCompiler)
 	if ok {
-		for _, n := range group.matched {
+		for i, n := range group.matched {
 			err = fn(n.tags, func() (interface{}, error) {
 				v, err := n.Value(c.schema)
 				if err != nil {
@@ -300,12 +262,34 @@ func (c *Container) Iterate(ptr Pointer, fn IterateFunc, options ...ResolveOptio
 				return v.Interface(), nil
 			})
 			if err != nil {
-				return err
+				return fmt.Errorf("%s with index %d failed: %s", node, i, err)
 			}
 		}
 		return nil
 	}
 	return fmt.Errorf("iteration can be used with groups only")
+}
+
+func (c *Container) find(ptr Pointer, options ...ResolveOption) (*node, error) {
+	if ptr == nil {
+		return nil, fmt.Errorf("target must be a pointer, got nil")
+	}
+	if reflect.ValueOf(ptr).Kind() != reflect.Ptr {
+		return nil, fmt.Errorf("target must be a pointer, got %s", reflect.TypeOf(ptr))
+	}
+	params := ResolveParams{}
+	// apply extract options
+	for _, opt := range options {
+		opt.applyResolve(&params)
+	}
+	node, err := c.schema.find(reflect.TypeOf(ptr).Elem(), params.Tags)
+	if err != nil {
+		return nil, err
+	}
+	if err := prepare(c.schema, node); err != nil {
+		return nil, err
+	}
+	return node, nil
 }
 
 // Cleanup runs destructors in reverse order that was been created.

@@ -141,7 +141,7 @@ func TestContainer_Resolve(t *testing.T) {
 		err = c.Resolve(nil)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "container_test.go:")
-		require.Contains(t, err.Error(), ": resolve target must be a pointer, got nil")
+		require.Contains(t, err.Error(), ": target must be a pointer, got nil")
 	})
 
 	t.Run("resolve into struct cause error", func(t *testing.T) {
@@ -151,7 +151,7 @@ func TestContainer_Resolve(t *testing.T) {
 		err = c.Resolve(struct{}{})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "container_test.go:")
-		require.Contains(t, err.Error(), ": resolve target must be a pointer, got struct {}")
+		require.Contains(t, err.Error(), ": target must be a pointer, got struct {}")
 	})
 
 	t.Run("resolve into string cause error", func(t *testing.T) {
@@ -161,7 +161,7 @@ func TestContainer_Resolve(t *testing.T) {
 		err = c.Resolve("string")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "container_test.go:")
-		require.Contains(t, err.Error(), ": resolve target must be a pointer, got string")
+		require.Contains(t, err.Error(), ": target must be a pointer, got string")
 	})
 
 	t.Run("resolve with failed build", func(t *testing.T) {
@@ -421,6 +421,34 @@ func TestContainer_Groups(t *testing.T) {
 }
 
 func TestContainer_Iterate(t *testing.T) {
+	t.Run("iterate over nil causes error", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		err = c.Iterate(nil, func(tags di.Tags, loader di.Loader) error {
+			return nil
+		})
+		require.EqualError(t, err, "target must be a pointer, got nil")
+	})
+	t.Run("iterate over struct causes error", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		err = c.Iterate(http.ServeMux{}, func(tags di.Tags, loader di.Loader) error {
+			return nil
+		})
+		require.EqualError(t, err, "target must be a pointer, got http.ServeMux")
+	})
+	t.Run("iterate over struct causes error", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		require.NoError(t, c.Provide(func() http.ServeMux { return http.ServeMux{} }))
+		err = c.Iterate(&http.ServeMux{}, func(tags di.Tags, loader di.Loader) error {
+			return nil
+		})
+		require.EqualError(t, err, "iteration can be used with groups only")
+	})
 	t.Run("iterates over instances", func(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)
@@ -476,6 +504,28 @@ func TestContainer_Iterate(t *testing.T) {
 			{"conn": "tcp1"},
 			{"conn": "tcp2"},
 		}, all)
+	})
+
+	t.Run("iterates over instances with errors", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		conn1 := &net.TCPConn{}
+		conn2 := &net.TCPConn{}
+		require.NoError(t, c.Provide(func() *net.TCPConn { return conn1 }))
+		require.NoError(t, c.Provide(func() (*net.TCPConn, error) { return conn2, fmt.Errorf("tcp conn 2 error") }))
+		var iterates []*net.TCPConn
+		var conn []*net.TCPConn
+		iterFn := func(tags di.Tags, loader di.Loader) error {
+			i, err := loader()
+			if err != nil {
+				return err
+			}
+			iterates = append(iterates, i.(*net.TCPConn))
+			return nil
+		}
+		err = c.Iterate(&conn, iterFn)
+		require.EqualError(t, err, "[]*net.TCPConn with index 1 failed: tcp conn 2 error")
 	})
 }
 

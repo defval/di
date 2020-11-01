@@ -74,6 +74,6 @@ func TestOptions(t *testing.T) {
 		)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "options_test.go:")
-		require.Contains(t, err.Error(), ": resolve target must be a pointer, got func()")
+		require.Contains(t, err.Error(), ": target must be a pointer, got func()")
 	})
 }
