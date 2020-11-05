@@ -47,49 +47,23 @@ comments. If you do not have experience with auto-wiring libraries as
 go get github.com/goava/di
 ```
 
-## Examples `main.go`
-
-Full code examples [here](./_examples/goway/main.go) and [here](./_examples/tutorial/main.go).
-
-### Without `di`:
+## What it looks like
 
 ```go
-func main() {
-	orders := NewOrderController()
-	users := NewUserController()
-	mux := NewServeMux()
-	mux.HandleFunc("/orders", orders.RetrieveOrders)
-	mux.HandleFunc("/users", users.RetrieveUsers)
-	server := NewServer(mux)
-	log.Println("start server")
-	errChan := make(chan error)
-	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			errChan <- err
-		}
-	}()
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		stop := make(chan os.Signal)
-		signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
-		<-stop
-		cancel()
-	}()
-	select {
-	case <-ctx.Done():
-		log.Println("stop server")
-		if err := server.Close(); err != nil {
-			log.Fatal(err)
-		}
-	case err := <-errChan:
-		log.Fatal(err)
-	}
-}
-```
+package main
 
-### With `di`:
+import (
+	"context"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
-```go
+	"github.com/goava/di"
+)
+
 func main() {
 	c, err := di.New(
 		// provide StdLogger implementation as di.Logger interface
@@ -110,7 +84,7 @@ func main() {
 }
 ```
 
-Full code examples [here](./_examples/goway/main.go) and [here](./_examples/tutorial/main.go).
+Full code available [here](./_examples/tutorial/main.go).
 
 ## Questions
 

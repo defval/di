@@ -14,13 +14,14 @@ import (
 
 func main() {
 	c, err := di.New(
+		// provide StdLogger implementation as di.Logger interface
 		di.Provide(NewStdLogger, di.As(new(di.Logger))),
 		di.Provide(NewContext),  // provide application context
 		di.Provide(NewServer),   // provide http server
 		di.Provide(NewServeMux), // provide http serve mux
-		// controllers
-		di.Provide(NewOrderController, di.As(new(Controller))), // provide order controller
-		di.Provide(NewUserController, di.As(new(Controller))),  // provide user controller
+		// provide controller implementations as Controller interface
+		di.Provide(NewOrderController, di.As(new(Controller))),
+		di.Provide(NewUserController, di.As(new(Controller))),
 	)
 	if err != nil {
 		log.Fatal(err)
