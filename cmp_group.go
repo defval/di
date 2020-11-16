@@ -17,10 +17,14 @@ func newGroupCompiler(rt reflect.Type, matched []*node) *groupCompiler {
 	}
 }
 
-func (g *groupCompiler) params(s schema) (params []*node, err error) {
-	return g.matched, nil
+func (c *groupCompiler) params(s schema) (params []*node, err error) {
+	return c.matched, nil
 }
 
-func (g *groupCompiler) compile(dependencies []reflect.Value, s schema) (reflect.Value, error) {
-	return reflect.Append(reflect.New(g.rt).Elem(), dependencies...), nil
+func (c *groupCompiler) compile(dependencies []reflect.Value, s schema) (reflect.Value, error) {
+	return reflect.Append(reflect.New(c.rt).Elem(), dependencies...), nil
+}
+
+func (c *groupCompiler) fields() map[int]field {
+	return nil
 }

@@ -979,6 +979,45 @@ func TestContainer_Injectable(t *testing.T) {
 		require.Contains(t, err.Error(), ": di_test.Parameter: type *http.Server not exists in the container")
 	})
 
+	t.Run("resolving provided injectable as interface with dependency", func(t *testing.T) {
+		type InjectableType struct {
+			di.Inject
+			Server *http.Server
+		}
+		ctor := func() *InjectableType {
+			return &InjectableType{}
+		}
+		server := &http.Server{}
+		c, err := di.New(
+			di.Provide(func() *http.Server { return server }),
+			di.Provide(ctor, di.As(new(di.Interface))),
+		)
+		require.NoError(t, err)
+		var b di.Interface
+		err = c.Resolve(&b)
+		require.NoError(t, err)
+		require.Equal(t, fmt.Sprintf("%p", server), fmt.Sprintf("%p", b.(*InjectableType).Server))
+	})
+
+	t.Run("resolving provided injectable as interface without dependency cause error", func(t *testing.T) {
+		type InjectableType struct {
+			di.Inject
+			Server *http.Server
+		}
+		ctor := func() *InjectableType {
+			return &InjectableType{}
+		}
+		c, err := di.New(
+			di.Provide(ctor, di.As(new(di.Interface))),
+		)
+		require.NoError(t, err)
+		var b di.Interface
+		err = c.Resolve(&b)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "container_test.go:")
+		require.Contains(t, err.Error(), ": di.Interface: type *http.Server not exists in the container")
+	})
+
 	t.Run("invoke with inject dependency struct", func(t *testing.T) {
 		type InjectableParam struct {
 			di.Inject

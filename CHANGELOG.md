@@ -7,6 +7,12 @@ The format is based on
 project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html): TBD, use modules or another vendor system.
 
+## v1.4.1
+
+### Fixed
+
+- Fix field injection into interface implementations.
+
 ## v1.4.0
 
 ### Added

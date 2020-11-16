@@ -99,3 +99,43 @@ func parseField(f reflect.StructField) (field, bool) {
 		optional: tags["optional"] == "true",
 	}, true
 }
+
+func fields(rt reflect.Type) map[int]field {
+	if !isInjectable(rt) {
+		return nil
+	}
+	var rv reflect.Value
+	if !rv.IsValid() {
+		switch rt.Kind() {
+		case reflect.Ptr:
+			rv = reflect.New(rt.Elem())
+		default:
+			rv = reflect.New(rt).Elem()
+		}
+	}
+	if rt.Kind() == reflect.Ptr {
+		rt = rt.Elem()
+		rv = rv.Elem()
+	}
+	fields := make(map[int]field, rt.NumField())
+	// fi - field index
+	for fi := 0; fi < rt.NumField(); fi++ {
+		fv := rv.Field(fi)
+		// check that field can be set
+		if !fv.CanSet() || rt.Field(fi).Anonymous {
+			continue
+		}
+		// cur - current field
+		cur := rt.Field(fi)
+		f, valid := parseField(cur)
+		if !valid {
+			continue
+		}
+		fields[fi] = field{
+			rt:       cur.Type,
+			tags:     f.tags,
+			optional: f.optional,
+		}
+	}
+	return fields
+}

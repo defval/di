@@ -10,4 +10,6 @@ type compiler interface {
 	params(s schema) (params []*node, err error)
 	// compile compiles resolved dependencies into value.
 	compile(dependencies []reflect.Value, s schema) (reflect.Value, error)
+	// fields return injectable fields.
+	fields() map[int]field
 }

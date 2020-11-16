@@ -65,6 +65,10 @@ func (c ctorCompiler) compile(dependencies []reflect.Value, s schema) (reflect.V
 	return reflect.Value{}, nil
 }
 
+func (c ctorCompiler) fields() map[int]field {
+	return fields(c.fn.Out(0))
+}
+
 // determineCtorType
 func determineCtorType(fn function) ctorType {
 	switch true {
