@@ -44,13 +44,13 @@ func (s *defaultSchema) register(n *node) {
 func (s *defaultSchema) find(t reflect.Type, tags Tags) (*node, error) {
 	nodes, ok := s.nodes[t]
 	if !ok && t.Kind() != reflect.Slice && !isInjectable(t) {
-		return nil, fmt.Errorf("type %s%s not exists in the container", t, tags)
+		return nil, fmt.Errorf("type %s%s %w", t, tags, ErrTypeNotExists)
 	}
 	// type found
 	if ok {
 		matched := matchTags(nodes, tags)
 		if len(matched) == 0 {
-			return nil, fmt.Errorf("%s%s not exists", t, tags)
+			return nil, fmt.Errorf("type %s%s %w", t, tags, ErrTypeNotExists)
 		}
 		if len(matched) > 1 {
 			return nil, fmt.Errorf("multiple definitions of %s%s, maybe you need to use group type: []%s%s", t, tags, t, tags)
@@ -61,7 +61,7 @@ func (s *defaultSchema) find(t reflect.Type, tags Tags) (*node, error) {
 		// constructor result with di.Inject - only addressable pointers
 		// anonymous parameters with di.Inject - only struct
 		if t.Kind() == reflect.Ptr {
-			return nil, fmt.Errorf("inject %s%s fields not supported, use %s%s", t, tags, t.Elem(), tags)
+			return nil, fmt.Errorf("inject %s%s %w, use %s%s", t, tags, errFieldsNotSupported, t.Elem(), tags)
 		}
 		node := &node{
 			rv:       &reflect.Value{},
@@ -78,11 +78,11 @@ func (s *defaultSchema) find(t reflect.Type, tags Tags) (*node, error) {
 func (s *defaultSchema) group(t reflect.Type, tags Tags) (*node, error) {
 	group, ok := s.nodes[t.Elem()]
 	if !ok {
-		return nil, fmt.Errorf("%s%s not exists", t, tags)
+		return nil, fmt.Errorf("type %s%s %w", t, tags, ErrTypeNotExists)
 	}
 	matched := matchTags(group, tags)
 	if len(matched) == 0 {
-		return nil, fmt.Errorf("%s%s not exists", t, tags)
+		return nil, fmt.Errorf("type %s%s %w", t, tags, ErrTypeNotExists)
 	}
 	node := &node{
 		rv:       &reflect.Value{},

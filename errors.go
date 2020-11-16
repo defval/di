@@ -1,75 +1,36 @@
 package di
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/goava/di/internal/stacktrace"
 )
 
+var (
+	// ErrTypeNotExists causes when type not found in container.
+	ErrTypeNotExists = errors.New("not exists in the container")
+)
+
+var (
+	errInvalidInvocationSignature = errors.New("invalid invocation signature")
+	errCycleDetected              = errors.New("cycle detected")
+	errFieldsNotSupported         = errors.New("fields not supported")
+)
+
 // knownError return true if err is library known error.
 func knownError(err error) bool {
-	switch err.(type) {
-	case errProvideFailed, errResolveFailed, errInvokeFailed, errInvalidInvocation:
+	if errors.Is(err, ErrTypeNotExists) ||
+		errors.Is(err, errInvalidInvocationSignature) ||
+		errors.Is(err, errCycleDetected) ||
+		errors.Is(err, errFieldsNotSupported) {
 		return true
-	default:
-		return false
 	}
+	return false
 }
 
-func provideErrWithStack(err error) errProvideFailed {
-	return errProvideFailed{stacktrace.CallerFrame(1), err}
-}
-
-func invokeErrWithStack(err error) errInvokeFailed {
-	return errInvokeFailed{stacktrace.CallerFrame(1), err}
-}
-
-// errProvideFailed causes when constructor providing failed.
-type errProvideFailed struct {
-	frame stacktrace.Frame
-	err   error
-}
-
-// Error returns error string.
-func (e errProvideFailed) Error() string {
-	return fmt.Sprintf("%s: %s", e.frame, e.err)
-}
-
-// errInvokeFailed causes when invoke failed.
-type errInvokeFailed struct {
-	frame stacktrace.Frame
-	err   error
-}
-
-// Error returns error string.
-func (e errInvokeFailed) Error() string {
-	return fmt.Sprintf("%s: %s", e.frame, e.err)
-}
-
-func resolveErrWithStack(err error) errResolveFailed {
-	return errResolveFailed{
-		frame: stacktrace.CallerFrame(1),
-		err:   err,
-	}
-}
-
-// errResolveFailed causes when type resolve failed.
-type errResolveFailed struct {
-	frame stacktrace.Frame
-	err   error
-}
-
-// Error returns error string.
-func (e errResolveFailed) Error() string {
-	return fmt.Sprintf("%s: %s", e.frame, e.err)
-}
-
-type errInvalidInvocation struct {
-	err error
-}
-
-func (e errInvalidInvocation) Error() string {
-	return e.err.Error()
+func errWithStack(err error) error {
+	return fmt.Errorf("%s: %w", stacktrace.CallerFrame(1), err)
 }
 
 func bug() {

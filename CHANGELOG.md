@@ -7,6 +7,21 @@ The format is based on
 project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html): TBD, use modules or another vendor system.
 
+## v1.5.0
+
+
+### Added
+
+- Add error to `Has()`.
+
+### Fixed
+
+- `Has()` returns false if container could not build instance.
+
+### Changed
+
+- The supported version of go >1.13.
+
 ## v1.4.1
 
 ### Fixed

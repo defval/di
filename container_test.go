@@ -1,6 +1,7 @@
 package di_test
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -207,6 +208,7 @@ func TestContainer_Resolve(t *testing.T) {
 		require.NoError(t, err)
 		err = c.Resolve(&http.Server{})
 		require.Error(t, err)
+		require.True(t, errors.Is(err, di.ErrTypeNotExists))
 		require.Contains(t, err.Error(), "container_test.go:")
 		require.Contains(t, err.Error(), ": type http.Server not exists in the container")
 	})
@@ -575,7 +577,7 @@ func TestContainer_Tags(t *testing.T) {
 		err = c.Resolve(&mux, di.Name("unknown"))
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "container_test.go:")
-		require.Contains(t, err.Error(), ": *http.ServeMux[name:unknown] not exists")
+		require.Contains(t, err.Error(), ": type *http.ServeMux[name:unknown] not exists")
 	})
 
 	t.Run("provide duplication of named definition", func(t *testing.T) {
@@ -755,16 +757,12 @@ func TestContainer_Invoke(t *testing.T) {
 }
 
 func TestContainer_Has(t *testing.T) {
-	t.Run("exists on not compiled container return false", func(t *testing.T) {
-		c, err := di.New()
-		require.NoError(t, err)
-		require.False(t, c.Has(nil))
-	})
-
 	t.Run("exists nil returns false", func(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)
-		require.False(t, c.Has(nil))
+		has, err := c.Has(nil)
+		require.EqualError(t, err, "target must be a pointer, got nil")
+		require.False(t, has)
 	})
 
 	t.Run("exists return true if type exists", func(t *testing.T) {
@@ -772,14 +770,18 @@ func TestContainer_Has(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, c.Provide(func() *http.Server { return &http.Server{} }))
 		var server *http.Server
-		require.True(t, c.Has(&server))
+		has, err := c.Has(&server)
+		require.NoError(t, err)
+		require.True(t, has)
 	})
 
 	t.Run("exists return false if type not exists", func(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)
 		var server *http.Server
-		require.False(t, c.Has(&server))
+		has, err := c.Has(&server)
+		require.NoError(t, err)
+		require.False(t, has)
 	})
 
 	t.Run("exists interface", func(t *testing.T) {
@@ -787,7 +789,9 @@ func TestContainer_Has(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, c.Provide(func() *http.Server { return &http.Server{} }, di.As(new(io.Closer))))
 		var server io.Closer
-		require.True(t, c.Has(&server))
+		has, err := c.Has(&server)
+		require.NoError(t, err)
+		require.True(t, has)
 	})
 
 	t.Run("exists named provider", func(t *testing.T) {
@@ -796,7 +800,19 @@ func TestContainer_Has(t *testing.T) {
 		err = c.Provide(func() *http.Server { return &http.Server{} }, di.Tags{"name": "server"})
 		require.NoError(t, err)
 		var server *http.Server
-		require.True(t, c.Has(&server, di.Tags{"name": "server"}))
+		has, err := c.Has(&server, di.Tags{"name": "server"})
+		require.NoError(t, err)
+		require.True(t, has)
+	})
+
+	t.Run("type exists but no possible to build returns true", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NoError(t, c.Provide(func(b bool) *http.Server { return &http.Server{} }))
+		var server *http.Server
+		has, err := c.Has(&server)
+		require.EqualError(t, err, "*http.Server: type bool not exists in the container")
+		require.False(t, has)
 	})
 }
 

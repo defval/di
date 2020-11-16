@@ -1,6 +1,7 @@
 package di
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 )
@@ -67,10 +68,7 @@ func New(options ...Option) (_ *Container, err error) {
 	// process di.Resolve() options
 	for _, provide := range c.initial.provides {
 		if err := c.provide(provide.constructor, provide.options...); err != nil {
-			return nil, errProvideFailed{
-				provide.frame,
-				err,
-			}
+			return nil, fmt.Errorf("%s: %w", provide.frame, err)
 		}
 	}
 	// provide container to advanced usage e.g. condition providing
@@ -81,7 +79,7 @@ func New(options ...Option) (_ *Container, err error) {
 	for _, invoke := range c.initial.invokes {
 		err := c.invoke(invoke.fn, invoke.options...)
 		if err != nil && knownError(err) {
-			return nil, errInvokeFailed{invoke.frame, err}
+			return nil, fmt.Errorf("%s: %w", invoke.frame, err)
 		}
 		if err != nil {
 			return nil, err
@@ -90,7 +88,7 @@ func New(options ...Option) (_ *Container, err error) {
 	// process di.Resolve() options
 	for _, resolve := range c.initial.resolves {
 		if err := c.resolve(resolve.target, resolve.options...); err != nil {
-			return nil, errResolveFailed{resolve.frame, err}
+			return nil, fmt.Errorf("%s: %w", resolve.frame, err)
 		}
 	}
 	return c, nil
@@ -101,7 +99,7 @@ func New(options ...Option) (_ *Container, err error) {
 // the process of type resolving.
 func (c *Container) Provide(constructor Constructor, options ...ProvideOption) error {
 	if err := c.provide(constructor, options...); err != nil {
-		return provideErrWithStack(err)
+		return errWithStack(err)
 	}
 	return nil
 }
@@ -157,7 +155,7 @@ type Pointer interface{}
 //	}
 func (c *Container) Resolve(ptr Pointer, options ...ResolveOption) error {
 	if err := c.resolve(ptr, options...); err != nil {
-		return resolveErrWithStack(err)
+		return errWithStack(err)
 	}
 	return nil
 }
@@ -181,7 +179,7 @@ func (c *Container) resolve(ptr Pointer, options ...ResolveOption) error {
 func (c *Container) Invoke(invocation Invocation, options ...InvokeOption) error {
 	err := c.invoke(invocation, options...)
 	if err != nil && knownError(err) {
-		return invokeErrWithStack(err)
+		return errWithStack(err)
 	}
 	if err != nil {
 		return err
@@ -195,27 +193,27 @@ func (c *Container) invoke(invocation Invocation, _ ...InvokeOption) error {
 	// 	opt.apply(&params)
 	// }
 	if invocation == nil {
-		return errInvalidInvocation{fmt.Errorf("invalid invocation signature, got %s", "nil")}
+		return fmt.Errorf("%w, got %s", errInvalidInvocationSignature, "nil")
 	}
 	fn, valid := inspectFunction(invocation)
 	if !valid {
-		return errInvalidInvocation{fmt.Errorf("invalid invocation signature, got %s", fn.Type)}
+		return fmt.Errorf("%w, got %s", errInvalidInvocationSignature, fn.Type)
 	}
 	if !validateInvocation(fn) {
-		return errInvalidInvocation{fmt.Errorf("invalid invocation signature, got %s", fn.Type)}
+		return fmt.Errorf("%w, got %s", errInvalidInvocationSignature, fn.Type)
 	}
 	nodes, err := getFunctionNodes(fn, c.schema)
 	if err != nil {
-		return errInvalidInvocation{err}
+		return err
 	}
 	var args []reflect.Value
 	for _, node := range nodes {
 		if err := prepare(c.schema, node); err != nil {
-			return errInvalidInvocation{err}
+			return err
 		}
 		v, err := node.Value(c.schema)
 		if err != nil {
-			return errInvalidInvocation{err}
+			return err
 		}
 		args = append(args, v)
 	}
@@ -234,11 +232,14 @@ func (c *Container) invoke(invocation Invocation, _ ...InvokeOption) error {
 //	}
 //
 // It like Resolve() but doesn't instantiate a type.
-func (c *Container) Has(target Pointer, options ...ResolveOption) bool {
-	if _, err := c.find(target, options...); err != nil {
-		return false
+func (c *Container) Has(target Pointer, options ...ResolveOption) (bool, error) {
+	if _, err := c.find(target, options...); errors.Is(err, ErrTypeNotExists) {
+		return false, nil
+	} else if err != nil {
+		fmt.Println(err)
+		return false, err
 	}
-	return true
+	return true, nil
 }
 
 // ValueFunc is a lazy-loading wrapper for iteration.

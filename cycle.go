@@ -1,7 +1,6 @@
 package di
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -24,7 +23,7 @@ func visit(s schema, node *node, marks map[*node]int) error {
 		return nil
 	}
 	if marks[node] == temporary {
-		return errors.New("cycle detected") // todo: improve message
+		return errCycleDetected // todo: improve message
 	}
 	marks[node] = temporary
 	params, err := node.compiler.params(s)
