@@ -9,7 +9,6 @@ project adheres to
 
 ## v1.5.0
 
-
 ### Added
 
 - Add error to `Has()`.
