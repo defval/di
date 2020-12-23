@@ -232,7 +232,6 @@ func (c *Container) Has(target Pointer, options ...ResolveOption) (bool, error) 
 	if _, err := c.find(target, options...); errors.Is(err, ErrTypeNotExists) {
 		return false, nil
 	} else if err != nil {
-		fmt.Println(err)
 		return false, err
 	}
 	return true, nil
