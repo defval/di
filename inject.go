@@ -12,7 +12,7 @@ var iInjectable = reflect.TypeOf(new(injectable)).Elem()
 //	type MyType struct {
 //		di.Inject
 //
-//		Server *http.Server `di:""` // will be injected
+//		Server *http.Server // will be injected
 //	}
 type Inject struct {
 	injectable
