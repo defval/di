@@ -4,13 +4,12 @@
 - [Tags](#tags)
 - [Optional parameters](#optional-parameters)
 - [Struct fields injection](#struct-fields-injection)
-- [Prototypes](#prototypes)
 - [Cleanup](#cleanup)
 
 ### Modules
 
 You can group previous options into single variable by using
-`di.Options()` :
+`di.Options()`:
 
 ```go
 // account module
@@ -57,9 +56,9 @@ type Follower struct {
 
 ```go
 // provide leader database
-di.Provide(NewLeader, di.Tags("type":"leader"})
+di.Provide(NewLeader, di.Tags{"type":"leader"})
 // provide follower database
-di.Provide(NewFollower, di.Tags("type", "follower"}))
+di.Provide(NewFollower, di.Tags{"type", "follower"}))
 ```
 
 If you need to resolve it from the container use `di.Tags` *resolve
@@ -92,7 +91,12 @@ func NewService(parameters Parameters) *Service {
 }
 ```
 
-If you need to resolve all types with same tag key, use `*` as tag value.
+If you need to resolve all types with same tag key, use `*` as tag value:
+
+```go
+var db []*Database
+di.Resolve(&db, di.Tags{"type": "*"})
+```
 
 ### Optional parameters
 

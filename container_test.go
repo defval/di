@@ -14,6 +14,10 @@ import (
 	"github.com/goava/di"
 )
 
+func init() {
+	di.SetTracer(di.StdTracer{})
+}
+
 func TestContainer_Provide(t *testing.T) {
 	t.Run("simple constructor", func(t *testing.T) {
 		c, err := di.New()
@@ -816,7 +820,7 @@ func TestContainer_Has(t *testing.T) {
 	})
 }
 
-func TestContainer_Injectable(t *testing.T) {
+func TestContainer_Inject(t *testing.T) {
 	t.Run("constructor with injectable pointer", func(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)
@@ -833,12 +837,29 @@ func TestContainer_Injectable(t *testing.T) {
 		require.Equal(t, fmt.Sprintf("%p", mux), fmt.Sprintf("%p", result.Mux))
 	})
 
+	// todo: https://github.com/goava/di/issues/29
+	//t.Run("constructor with injectable embed pointer", func(t *testing.T) {
+	//	c, err := di.New()
+	//	require.NoError(t, err)
+	//	type InjectableType struct {
+	//		di.Inject
+	//		*http.ServeMux
+	//	}
+	//	mux := &http.ServeMux{}
+	//	require.NoError(t, c.Provide(func() *http.ServeMux { return mux }))
+	//	require.NoError(t, c.Provide(func() *InjectableType { return &InjectableType{} }))
+	//	var result *InjectableType
+	//	require.NoError(t, c.Resolve(&result))
+	//	require.NotNil(t, result.ServeMux)
+	//	require.Equal(t, fmt.Sprintf("%p", mux), fmt.Sprintf("%p", result.ServeMux))
+	//})
+
 	t.Run("provide injectable struct cause error", func(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)
 		type InjectableType struct {
 			di.Inject
-			Mux *http.ServeMux `di:""`
+			Mux *http.ServeMux
 		}
 		mux := &http.ServeMux{}
 		require.NoError(t, c.Provide(func() *http.ServeMux { return mux }))
@@ -893,7 +914,7 @@ func TestContainer_Injectable(t *testing.T) {
 		require.NoError(t, err)
 		type InjectableType struct {
 			di.Inject
-			Mux *http.ServeMux `di:"" optional:"true"`
+			Mux *http.ServeMux `optional:"true"`
 		}
 		require.NoError(t, c.Provide(func() *InjectableType { return &InjectableType{} }))
 		var result *InjectableType
@@ -930,7 +951,7 @@ func TestContainer_Injectable(t *testing.T) {
 		require.NoError(t, err)
 		type Parameter struct {
 			di.Inject
-			Server *http.Server `di:"" optional:"true"`
+			Server *http.Server `optional:"true"`
 		}
 		type Result struct {
 			server *http.Server
@@ -946,7 +967,7 @@ func TestContainer_Injectable(t *testing.T) {
 		require.NoError(t, err)
 		type Params struct {
 			di.Inject
-			Handlers []http.Handler `di:"optional" optional:"true"`
+			Handlers []http.Handler `optional:"true"`
 		}
 		require.NoError(t, c.Provide(func(params Params) bool {
 			return params.Handlers == nil
@@ -1052,7 +1073,7 @@ func TestContainer_Injectable(t *testing.T) {
 	t.Run("invoke with inject dependency pointer", func(t *testing.T) {
 		type InjectableParam struct {
 			di.Inject
-			Mux *http.ServeMux `di:""`
+			Mux *http.ServeMux
 		}
 		c, err := di.New()
 		require.NoError(t, err)

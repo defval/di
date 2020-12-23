@@ -33,6 +33,7 @@ func newDefaultSchema() *defaultSchema {
 // register registers reflect.Type provide function with optional Tags. Also, its registers
 // type []<type> for group.
 func (s *defaultSchema) register(n *node) {
+	defer tracer.Trace("Register %s", n)
 	if _, ok := s.nodes[n.rt]; !ok {
 		s.nodes[n.rt] = []*node{n}
 		return

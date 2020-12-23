@@ -6,12 +6,26 @@ that processes HTTP requests.
 The full tutorial code is available
 [here](./../_examples/tutorial/main.go).
 
+- [Tracing](#tracing)
 - [Provide](#provide)
 - [Resolve](#resolve)
 - [Invoke](#invoke)
 - [Lazy-loading](#lazy-loading)
 - [Interfaces](#interfaces)
 - [Groups](#groups)
+
+### Tracing
+
+Before start, you can set a tracing. It gives you more information about
+the library lifecycle. The `di` package contains the default tracer that
+prints output with a standard `log` package. Its use:
+
+```go
+func main() {
+	di.SetTracer(&di.StdTracer{})
+	//...
+}
+```
 
 ### Provide
 
@@ -75,8 +89,8 @@ if err != nil {
 server.ListenAndServe()
 ```
 
-> Note, by default the container creates singletons. But you can change
-> this behaviour. See [Prototypes](.#prototypes).
+> The container creates singletons for combination with same type and
+> tags.
 
 ### Invoke
 
@@ -108,8 +122,8 @@ if err != nil {
 }
 ```
 
-The container runs all `invoke functions` on the compile stage in the
-order they were declared. If one of then fails, the compilation fails.
+The container runs all `invoke functions` in the order they were
+declared. If one of them fails, the compilation fails.
 
 ### Lazy-loading
 
@@ -126,8 +140,10 @@ The arguments of this option must be a pointer(s) to an interface like
 di.Provide(NewServeMux, di.As(new(http.Handler)))
 ```
 
-> This syntax can look strange, but I haven't found a better way to
-> specify the interface.
+> This syntax with `new` can look strange, but I haven't found a better
+> way to specify the interface.
+>
+> Create a issue if you know a better way ;)
 
 Updated server constructor:
 

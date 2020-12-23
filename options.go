@@ -173,13 +173,6 @@ func Options(options ...Option) Option {
 	})
 }
 
-// WithLogger sets container logger.
-func WithLogger(logger Logger) Option {
-	return option(func(c *Container) {
-		c.logger = logger
-	})
-}
-
 // ProvideParams is a Provide() method options. Name is a unique identifier of type instance. Provider is a constructor
 // function. Interfaces is a interface that implements a provider result type.
 type ProvideParams struct {

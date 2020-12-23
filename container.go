@@ -8,8 +8,6 @@ import (
 
 // Container is a dependency injection container.
 type Container struct {
-	// Logger that logs internal actions.
-	logger Logger
 	// Dependency injection schema.
 	schema *defaultSchema
 	// Initial options will be processed on di.New().
@@ -57,7 +55,6 @@ type Container struct {
 //	}
 func New(options ...Option) (_ *Container, err error) {
 	c := &Container{
-		logger:   nopLogger{},
 		schema:   newDefaultSchema(),
 		cleanups: []func(){},
 	}
@@ -74,7 +71,6 @@ func New(options ...Option) (_ *Container, err error) {
 	// provide container to advanced usage e.g. condition providing
 	_ = c.provide(func() *Container { return c })
 	// error omitted because if logger could not be resolved it will be default
-	_ = c.resolve(&c.logger)
 	// process di.Invoke() options
 	for _, invoke := range c.initial.invokes {
 		err := c.invoke(invoke.fn, invoke.options...)
