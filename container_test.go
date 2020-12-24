@@ -976,6 +976,25 @@ func TestContainer_Inject(t *testing.T) {
 		require.Nil(t, extracted.server)
 	})
 
+	t.Run("resolve group in params", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+
+		type Fn func()
+		type Params struct {
+			di.Inject
+			Handlers []Fn `optional:"true"`
+		}
+		require.NoError(t, c.Provide(func() Fn { return func() {} }))
+		require.NoError(t, c.Provide(func() Fn { return func() {} }))
+		require.NoError(t, c.Provide(func(params Params) bool {
+			return len(params.Handlers) == 2
+		}))
+		var extracted bool
+		require.NoError(t, c.Resolve(&extracted))
+		require.True(t, extracted)
+	})
+
 	t.Run("optional group may be nil", func(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)

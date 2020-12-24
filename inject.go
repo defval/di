@@ -45,6 +45,7 @@ type field struct {
 func parseField(f reflect.StructField) (field, bool) {
 	tags := Tags{}
 	t := string(f.Tag)
+	optional := false
 	// this code copied from reflect.StructField.Lookup() method.
 	for t != "" {
 		// Skip leading space.
@@ -91,12 +92,18 @@ func parseField(f reflect.StructField) (field, bool) {
 		if name == "skip" && value == "true" {
 			return field{}, false
 		}
+		if name == "optional" {
+			if value == "true" {
+				optional = true
+			}
+			continue
+		}
 		tags[name] = value
 	}
 	return field{
 		rt:       f.Type,
 		tags:     tags,
-		optional: tags["optional"] == "true",
+		optional: optional,
 	}, true
 }
 

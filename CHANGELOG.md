@@ -7,6 +7,12 @@ The format is based on
 project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html): TBD, use modules or another vendor system.
 
+## v1.6.3
+
+### Fixed
+
+- Fix `optional` fields resolving.
+
 ## v1.6.2
 
 ### Fixed
