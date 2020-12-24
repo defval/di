@@ -119,6 +119,20 @@ func TestContainer_Provide(t *testing.T) {
 		require.Contains(t, err.Error(), ": *http.Server not implement io.Reader")
 	})
 
+	t.Run("provide type as several interfaces", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		file := &os.File{}
+		require.NoError(t, c.Provide(func() *os.File { return file }, di.As(new(io.Closer), new(io.ReadCloser))))
+		var closer io.Closer
+		var readCloser io.ReadCloser
+		require.NoError(t, c.Resolve(&closer))
+		require.NoError(t, c.Resolve(&readCloser))
+		require.Equal(t, fmt.Sprintf("%p", closer), fmt.Sprintf("%p", file))
+		require.Equal(t, fmt.Sprintf("%p", readCloser), fmt.Sprintf("%p", file))
+	})
+
 	t.Run("using not interface type in di.As() cause error", func(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)
