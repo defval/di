@@ -136,7 +136,6 @@ func (c *Container) provide(constructor Constructor, options ...ProvideOption) e
 			tags:     n.tags,
 			compiler: n.compiler,
 		})
-		return nil
 	}
 	return nil
 }
