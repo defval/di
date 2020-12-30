@@ -13,7 +13,7 @@ func newTypeCompiler(rt reflect.Type) *typeCompiler {
 	return &typeCompiler{rt: rt}
 }
 
-func (c typeCompiler) params(s schema) (params []*node, err error) {
+func (c typeCompiler) deps(s schema) (deps []*node, err error) {
 	return nil, nil
 }
 
@@ -22,5 +22,5 @@ func (c typeCompiler) compile(dependencies []reflect.Value, s schema) (reflect.V
 }
 
 func (c *typeCompiler) fields() map[int]field {
-	return fields(c.rt)
+	return parseFields(c.rt)
 }

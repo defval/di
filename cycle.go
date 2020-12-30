@@ -26,7 +26,7 @@ func visit(s schema, node *node, marks map[*node]int) error {
 		return errCycleDetected // todo: improve message
 	}
 	marks[node] = temporary
-	params, err := node.compiler.params(s)
+	params, err := node.deps(s)
 	if err != nil {
 		return fmt.Errorf("%s: %s", node, err)
 	}

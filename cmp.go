@@ -4,12 +4,12 @@ import (
 	"reflect"
 )
 
-// compiler compiles node result type.
+// compiler compiles dependency node.
 type compiler interface {
-	// params returns compiler params nodes.
-	params(s schema) (params []*node, err error)
-	// compile compiles resolved dependencies into value.
+	// deps return array of nodes that will be used for node compilation.
+	deps(s schema) ([]*node, error)
+	// compile compiles node. The dependencies are already compiled dependencies of this type.
 	compile(dependencies []reflect.Value, s schema) (reflect.Value, error)
-	// fields return injectable fields.
+	// fields return types that must be injected into compiled structure.
 	fields() map[int]field
 }

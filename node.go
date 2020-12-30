@@ -7,16 +7,16 @@ import (
 
 // node is a dependency injection node.
 type node struct {
-	rv   *reflect.Value
-	rt   reflect.Type
-	tags Tags
 	compiler
+	rv     *reflect.Value
+	rt     reflect.Type
+	tags   Tags
 	tracer Tracer
 }
 
 // parse parses fn constructor.
 func nodeFromFunction(fn function) (*node, error) {
-	cmp, ok := newFuncCompiler(fn)
+	cmp, ok := newConstructorCompiler(fn)
 	if !ok {
 		return nil, fmt.Errorf("invalid constructor signature, got %s", fn.Type)
 	}
@@ -37,7 +37,7 @@ func nodeFromFunction(fn function) (*node, error) {
 		if !ok {
 			return nil, fmt.Errorf("tags usage error: need to embed di.Tags without field name")
 		}
-		field, ok := parseField(f)
+		field, ok := inspectStructField(f)
 		if ok {
 			tags = field.tags
 		}
@@ -60,7 +60,7 @@ func (n *node) Value(s schema) (reflect.Value, error) {
 	if n.rv != nil && n.rv.IsValid() {
 		return *n.rv, nil
 	}
-	nodes, err := n.params(s)
+	nodes, err := n.deps(s)
 	if err != nil {
 		tracer.Trace("%s: %s", n.String(), err)
 		return reflect.Value{}, err

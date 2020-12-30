@@ -17,7 +17,7 @@ func newGroupCompiler(rt reflect.Type, matched []*node) *groupCompiler {
 	}
 }
 
-func (c *groupCompiler) params(s schema) (params []*node, err error) {
+func (c *groupCompiler) deps(s schema) (deps []*node, err error) {
 	return c.matched, nil
 }
 

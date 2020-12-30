@@ -5,15 +5,22 @@ import (
 	"strconv"
 )
 
-var iInjectable = reflect.TypeOf(new(injectable)).Elem()
-
-// Inject indicates that public fields with special tag type will be injected automatically.
+// Inject indicates that struct public fields will be injected automatically.
 //
-//	type MyType struct {
+//	type Application struct {
 //		di.Inject
 //
 //		Server *http.Server // will be injected
 //	}
+//
+// You can specify tags for injected types:
+//
+//  type Application struct {
+//  	di.Inject
+//
+//		Public 	*http.Server `type:"public"` 	// *http.Server with type:public tag combination will be injected
+//		Private *http.Server `type:"private"` 	// *http.Server with type:private tag combination will be injected
+//  }
 type Inject struct {
 	injectable
 }
@@ -23,26 +30,66 @@ type injectable interface {
 	isInjectable()
 }
 
-// isInjectable checks that typ is injectable
-// Injectable type can be pointer to struct or struct and need to embed di.Inject.
-func isInjectable(typ reflect.Type) bool {
-	if typ.Kind() == reflect.Ptr && typ.Elem().Kind() == reflect.Struct {
-		return typ.Implements(iInjectable)
-	}
-	if typ.Kind() == reflect.Struct {
-		return typ.Implements(iInjectable)
-	}
-	return false
-}
-
 type field struct {
 	rt       reflect.Type
 	tags     Tags
 	optional bool
 }
 
-// parseField parses struct field
-func parseField(f reflect.StructField) (field, bool) {
+// isInjectable checks that typ is injectable
+// Injectable type can be pointer to struct or struct and need to embed di.Inject.
+func isInjectable(typ reflect.Type) bool {
+	if typ.Kind() == reflect.Ptr && typ.Elem().Kind() == reflect.Struct {
+		return typ.Implements(injectableInterface)
+	}
+	if typ.Kind() == reflect.Struct {
+		return typ.Implements(injectableInterface)
+	}
+	return false
+}
+
+func parseFields(rt reflect.Type) map[int]field {
+	if !isInjectable(rt) {
+		return nil
+	}
+	var rv reflect.Value
+	if !rv.IsValid() {
+		switch rt.Kind() {
+		case reflect.Ptr:
+			rv = reflect.New(rt.Elem())
+		default:
+			rv = reflect.New(rt).Elem()
+		}
+	}
+	if rt.Kind() == reflect.Ptr {
+		rt = rt.Elem()
+		rv = rv.Elem()
+	}
+	fields := make(map[int]field, rt.NumField())
+	// fi - field index
+	for fi := 0; fi < rt.NumField(); fi++ {
+		fv := rv.Field(fi)
+		// check that field can be set
+		if !fv.CanSet() || rt.Field(fi).Anonymous {
+			continue
+		}
+		// cur - current field
+		cur := rt.Field(fi)
+		f, valid := inspectStructField(cur)
+		if !valid {
+			continue
+		}
+		fields[fi] = field{
+			rt:       cur.Type,
+			tags:     f.tags,
+			optional: f.optional,
+		}
+	}
+	return fields
+}
+
+// inspectStructField parses struct field
+func inspectStructField(f reflect.StructField) (field, bool) {
 	tags := Tags{}
 	t := string(f.Tag)
 	optional := false
@@ -107,42 +154,4 @@ func parseField(f reflect.StructField) (field, bool) {
 	}, true
 }
 
-func fields(rt reflect.Type) map[int]field {
-	if !isInjectable(rt) {
-		return nil
-	}
-	var rv reflect.Value
-	if !rv.IsValid() {
-		switch rt.Kind() {
-		case reflect.Ptr:
-			rv = reflect.New(rt.Elem())
-		default:
-			rv = reflect.New(rt).Elem()
-		}
-	}
-	if rt.Kind() == reflect.Ptr {
-		rt = rt.Elem()
-		rv = rv.Elem()
-	}
-	fields := make(map[int]field, rt.NumField())
-	// fi - field index
-	for fi := 0; fi < rt.NumField(); fi++ {
-		fv := rv.Field(fi)
-		// check that field can be set
-		if !fv.CanSet() || rt.Field(fi).Anonymous {
-			continue
-		}
-		// cur - current field
-		cur := rt.Field(fi)
-		f, valid := parseField(cur)
-		if !valid {
-			continue
-		}
-		fields[fi] = field{
-			rt:       cur.Type,
-			tags:     f.tags,
-			optional: f.optional,
-		}
-	}
-	return fields
-}
+var injectableInterface = reflect.TypeOf(new(injectable)).Elem()

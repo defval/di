@@ -15,39 +15,39 @@ const (
 	ctorValueCleanupError          // (deps) (result, cleanup, error)
 )
 
-// ctorCompiler compiles constructor functions.
-type ctorCompiler struct {
+// constructorCompiler compiles constructor functions.
+type constructorCompiler struct {
 	typ ctorType
 	fn  function
 }
 
-// newFuncCompiler creates new function compiler from function.
-func newFuncCompiler(fn function) (*ctorCompiler, bool) {
+// newConstructorCompiler creates new function compiler from function.
+func newConstructorCompiler(fn function) (*constructorCompiler, bool) {
 	ctorType := determineCtorType(fn)
 	if ctorType == ctorUnknown {
 		return nil, false
 	}
-	return &ctorCompiler{
+	return &constructorCompiler{
 		typ: ctorType,
 		fn:  fn,
 	}, true
 }
 
-func (c ctorCompiler) params(s schema) (params []*node, err error) {
+func (c constructorCompiler) deps(s schema) (deps []*node, err error) {
 	for i := 0; i < c.fn.NumIn(); i++ {
 		in := c.fn.Type.In(i)
 		node, err := s.find(in, Tags{})
 		if err != nil {
 			return nil, err
 		}
-		params = append(params, node)
+		deps = append(deps, node)
 	}
-	return params, nil
+	return deps, nil
 }
 
-func (c ctorCompiler) compile(dependencies []reflect.Value, s schema) (reflect.Value, error) {
+func (c constructorCompiler) compile(dependencies []reflect.Value, s schema) (reflect.Value, error) {
 	// call constructor function
-	out := funcOut(c.fn.Call(dependencies))
+	out := funcResult(c.fn.Call(dependencies))
 	rv := out.value()
 	switch c.typ {
 	case ctorValue:
@@ -65,8 +65,8 @@ func (c ctorCompiler) compile(dependencies []reflect.Value, s schema) (reflect.V
 	return reflect.Value{}, nil
 }
 
-func (c ctorCompiler) fields() map[int]field {
-	return fields(c.fn.Out(0))
+func (c constructorCompiler) fields() map[int]field {
+	return parseFields(c.fn.Out(0))
 }
 
 // determineCtorType
@@ -87,16 +87,16 @@ func determineCtorType(fn function) ctorType {
 	return ctorUnknown
 }
 
-// funcOut is a helper struct for reflect.Call.
-type funcOut []reflect.Value
+// funcResult is a helper struct for reflect.Call.
+type funcResult []reflect.Value
 
 // value returns first result type.
-func (r funcOut) value() reflect.Value {
+func (r funcResult) value() reflect.Value {
 	return r[0]
 }
 
 // cleanup returns cleanup function.
-func (r funcOut) cleanup() func() {
+func (r funcResult) cleanup() func() {
 	if r[1].IsNil() {
 		return nil
 	}
@@ -104,7 +104,7 @@ func (r funcOut) cleanup() func() {
 }
 
 // error returns error if it exists.
-func (r funcOut) error(position int) error {
+func (r funcResult) error(position int) error {
 	if r[position].IsNil() {
 		return nil
 	}

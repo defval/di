@@ -212,7 +212,7 @@ func (c *Container) invoke(invocation Invocation, _ ...InvokeOption) error {
 		}
 		args = append(args, v)
 	}
-	res := funcOut(fn.Call(args))
+	res := funcResult(fn.Call(args))
 	if len(res) == 0 {
 		return nil
 	}
