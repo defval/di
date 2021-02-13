@@ -868,7 +868,6 @@ func TestContainer_Inject(t *testing.T) {
 		require.Equal(t, fmt.Sprintf("%p", mux), fmt.Sprintf("%p", it.Mux))
 	})
 
-	// todo: https://github.com/goava/di/issues/29
 	t.Run("constructor with injectable embed pointer", func(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)
