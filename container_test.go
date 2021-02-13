@@ -835,7 +835,7 @@ func TestContainer_Has(t *testing.T) {
 }
 
 func TestContainer_Inject(t *testing.T) {
-	t.Run("constructor with injectable pointer", func(t *testing.T) {
+	t.Run("inject into provided struct pointer with di.Inject", func(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)
 		type InjectableType struct {
@@ -851,24 +851,7 @@ func TestContainer_Inject(t *testing.T) {
 		require.Equal(t, fmt.Sprintf("%p", mux), fmt.Sprintf("%p", result.Mux))
 	})
 
-	// todo: https://github.com/goava/di/issues/29
-	//t.Run("constructor with injectable embed pointer", func(t *testing.T) {
-	//	c, err := di.New()
-	//	require.NoError(t, err)
-	//	type InjectableType struct {
-	//		di.Inject
-	//		*http.ServeMux
-	//	}
-	//	mux := &http.ServeMux{}
-	//	require.NoError(t, c.Provide(func() *http.ServeMux { return mux }))
-	//	require.NoError(t, c.Provide(func() *InjectableType { return &InjectableType{} }))
-	//	var result *InjectableType
-	//	require.NoError(t, c.Resolve(&result))
-	//	require.NotNil(t, result.ServeMux)
-	//	require.Equal(t, fmt.Sprintf("%p", mux), fmt.Sprintf("%p", result.ServeMux))
-	//})
-
-	t.Run("provide injectable struct cause error", func(t *testing.T) {
+	t.Run("inject into provided struct value with di.Inject", func(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)
 		type InjectableType struct {
@@ -878,9 +861,28 @@ func TestContainer_Inject(t *testing.T) {
 		mux := &http.ServeMux{}
 		require.NoError(t, c.Provide(func() *http.ServeMux { return mux }))
 		err = c.Provide(func() InjectableType { return InjectableType{} })
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "container_test.go:")
-		require.Contains(t, err.Error(), ": di.Inject not supported for unaddressable result of constructor, use *di_test.InjectableType instead")
+		require.NoError(t, err)
+		var it InjectableType
+		err = c.Resolve(&it)
+		require.NoError(t, err)
+		require.Equal(t, fmt.Sprintf("%p", mux), fmt.Sprintf("%p", it.Mux))
+	})
+
+	// todo: https://github.com/goava/di/issues/29
+	t.Run("constructor with injectable embed pointer", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		type InjectableType struct {
+			di.Inject
+			*http.ServeMux
+		}
+		mux := &http.ServeMux{}
+		require.NoError(t, c.Provide(func() *http.ServeMux { return mux }))
+		require.NoError(t, c.Provide(func() *InjectableType { return &InjectableType{} }))
+		var result *InjectableType
+		require.NoError(t, c.Resolve(&result))
+		require.NotNil(t, result.ServeMux)
+		require.Equal(t, fmt.Sprintf("%p", mux), fmt.Sprintf("%p", result.ServeMux))
 	})
 
 	t.Run("container resolve injectable parameter", func(t *testing.T) {
@@ -1112,10 +1114,12 @@ func TestContainer_Inject(t *testing.T) {
 		require.NoError(t, err)
 		mux := http.NewServeMux()
 		require.NoError(t, c.Provide(func() *http.ServeMux { return mux }))
-		err = c.Invoke(func(params *InjectableParam) {})
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "container_test.go:")
-		require.Contains(t, err.Error(), ": inject *di_test.InjectableParam fields not supported, use di_test.InjectableParam")
+		var ip *InjectableParam
+		err = c.Invoke(func(params *InjectableParam) {
+			ip = params
+		})
+		require.NoError(t, err)
+		require.Equal(t, fmt.Sprintf("%p", mux), fmt.Sprintf("%p", ip.Mux))
 	})
 }
 

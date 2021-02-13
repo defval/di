@@ -4,6 +4,7 @@
 - [Tags](#tags)
 - [Optional parameters](#optional-parameters)
 - [Struct fields injection](#struct-fields-injection)
+- [Iteration](#iteration)
 - [Cleanup](#cleanup)
 
 ### Modules
@@ -163,6 +164,10 @@ func NewController() *Controller {
     return &Controller{}
 }
 ```
+
+### Iteration
+
+TBD
 
 ### Cleanup
 

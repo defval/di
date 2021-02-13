@@ -36,20 +36,28 @@ type field struct {
 	optional bool
 }
 
-// isInjectable checks that typ is injectable
-// Injectable type can be pointer to struct or struct and need to embed di.Inject.
-func isInjectable(typ reflect.Type) bool {
-	if typ.Kind() == reflect.Ptr && typ.Elem().Kind() == reflect.Struct {
-		return typ.Implements(injectableInterface)
+// canInject checks that type t contain di.Inject and supports injecting.
+func canInject(t reflect.Type) (bool, error) {
+	if !t.Implements(injectableInterface) {
+		return false, nil
 	}
-	if typ.Kind() == reflect.Struct {
-		return typ.Implements(injectableInterface)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
 	}
-	return false
+	if t.Kind() != reflect.Struct {
+		return false, nil
+	}
+	return true, nil
 }
 
-func parseFields(rt reflect.Type) map[int]field {
-	if !isInjectable(rt) {
+// parsePopulateFields parses fields of struct that can be populated.
+func parsePopulateFields(rt reflect.Type) map[int]field {
+	inject, err := canInject(rt)
+	if err != nil {
+		// shouldn't be called
+		panic(err)
+	}
+	if !inject {
 		return nil
 	}
 	var rv reflect.Value
@@ -70,7 +78,7 @@ func parseFields(rt reflect.Type) map[int]field {
 	for fi := 0; fi < rt.NumField(); fi++ {
 		fv := rv.Field(fi)
 		// check that field can be set
-		if !fv.CanSet() || rt.Field(fi).Anonymous {
+		if !fv.CanSet() {
 			continue
 		}
 		// cur - current field

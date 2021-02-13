@@ -44,9 +44,6 @@ func (s *defaultSchema) register(n *node) {
 // find finds provideFunc by its reflect.Type and Tags.
 func (s *defaultSchema) find(t reflect.Type, tags Tags) (*node, error) {
 	nodes, ok := s.nodes[t]
-	if !ok && t.Kind() != reflect.Slice && !isInjectable(t) {
-		return nil, fmt.Errorf("type %s%s %w", t, tags, ErrTypeNotExists)
-	}
 	// type found
 	if ok {
 		matched := matchTags(nodes, tags)
@@ -58,16 +55,24 @@ func (s *defaultSchema) find(t reflect.Type, tags Tags) (*node, error) {
 		}
 		return matched[0], nil
 	}
-	if !ok && isInjectable(t) {
+	inject, err := canInject(t)
+	if err != nil {
+		return nil, err
+	}
+	// if not a group and not have di.Inject
+	if t.Kind() != reflect.Slice && !inject {
+		return nil, fmt.Errorf("type %s%s %w", t, tags, ErrTypeNotExists)
+	}
+	if inject {
 		// constructor result with di.Inject - only addressable pointers
 		// anonymous parameters with di.Inject - only struct
-		if t.Kind() == reflect.Ptr {
-			return nil, fmt.Errorf("inject %s%s %w, use %s%s", t, tags, errFieldsNotSupported, t.Elem(), tags)
-		}
+		//if t.Kind() == reflect.Ptr {
+		//	return nil, fmt.Errorf("inject %s%s %w, use %s%s", t, tags, errFieldsNotSupported, t.Elem(), tags)
+		//}
 		node := &node{
-			rv:       &reflect.Value{},
-			rt:       t,
 			compiler: newTypeCompiler(t),
+			rt:       t,
+			rv:       new(reflect.Value),
 		}
 		// save node for future use
 		s.nodes[t] = append(s.nodes[t], node)
@@ -86,10 +91,10 @@ func (s *defaultSchema) group(t reflect.Type, tags Tags) (*node, error) {
 		return nil, fmt.Errorf("type %s%s %w", t, tags, ErrTypeNotExists)
 	}
 	node := &node{
-		rv:       &reflect.Value{},
+		compiler: newGroupCompiler(t, matched),
 		rt:       t,
 		tags:     tags,
-		compiler: newGroupCompiler(t, matched),
+		rv:       new(reflect.Value),
 	}
 	return node, nil
 }

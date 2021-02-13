@@ -104,16 +104,12 @@ func (c *Container) provide(constructor Constructor, options ...ProvideOption) e
 	if constructor == nil {
 		return fmt.Errorf("invalid constructor signature, got nil")
 	}
-	fn, valid := inspectFunction(constructor)
-	if !valid {
-		return fmt.Errorf("invalid constructor signature, got %s", reflect.TypeOf(constructor))
-	}
 	params := ProvideParams{}
 	// apply provide options
 	for _, opt := range options {
 		opt.applyProvide(&params)
 	}
-	n, err := nodeFromFunction(fn)
+	n, err := newConstructorNode(constructor)
 	if err != nil {
 		return err
 	}
@@ -197,7 +193,7 @@ func (c *Container) invoke(invocation Invocation, _ ...InvokeOption) error {
 	if !validateInvocation(fn) {
 		return fmt.Errorf("%w, got %s", errInvalidInvocationSignature, fn.Type)
 	}
-	nodes, err := getFunctionNodes(fn, c.schema)
+	nodes, err := parseInvocationParameters(fn, c.schema)
 	if err != nil {
 		return err
 	}

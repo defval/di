@@ -66,7 +66,7 @@ func (c constructorCompiler) compile(dependencies []reflect.Value, s schema) (re
 }
 
 func (c constructorCompiler) fields() map[int]field {
-	return parseFields(c.fn.Out(0))
+	return parsePopulateFields(c.fn.Out(0))
 }
 
 // determineCtorType

@@ -5,35 +5,28 @@ import (
 	"reflect"
 )
 
-// node is a dependency injection node.
-type node struct {
-	compiler
-	rv     *reflect.Value
-	rt     reflect.Type
-	tags   Tags
-	tracer Tracer
-}
-
-// parse parses fn constructor.
-func nodeFromFunction(fn function) (*node, error) {
-	cmp, ok := newConstructorCompiler(fn)
+// newConstructorNode
+func newConstructorNode(ctor interface{}) (*node, error) {
+	f, valid := inspectFunction(ctor)
+	if !valid {
+		return nil, fmt.Errorf("invalid constructor signature, got %s", reflect.TypeOf(ctor))
+	}
+	cmp, ok := newConstructorCompiler(f)
 	if !ok {
-		return nil, fmt.Errorf("invalid constructor signature, got %s", fn.Type)
+		return nil, fmt.Errorf("invalid constructor signature, got %s", f.Type)
 	}
 	// result type
-	rt := fn.Out(0)
-	// constructor result with di.Inject - only addressable pointers
-	// anonymous parameters with di.Inject - only struct
-	if isInjectable(rt) && rt.Kind() != reflect.Ptr {
-		return nil, fmt.Errorf("di.Inject not supported for unaddressable result of constructor, use *%s instead", rt)
+	rt := f.Out(0)
+	if _, err := canInject(rt); err != nil {
+		return nil, err
 	}
 	tags := map[string]string{}
-	if isTaggable(rt) {
-		tt := rt
-		if tt.Kind() == reflect.Ptr {
-			tt = tt.Elem()
+	if haveTags(rt) {
+		tmp := rt
+		if tmp.Kind() == reflect.Ptr {
+			tmp = tmp.Elem()
 		}
-		f, ok := tt.FieldByName("Tags")
+		f, ok := tmp.FieldByName("Tags")
 		if !ok {
 			return nil, fmt.Errorf("tags usage error: need to embed di.Tags without field name")
 		}
@@ -43,11 +36,21 @@ func nodeFromFunction(fn function) (*node, error) {
 		}
 	}
 	return &node{
-		rv:       &reflect.Value{},
+		rv:       new(reflect.Value),
 		rt:       rt,
 		tags:     tags,
 		compiler: cmp,
 	}, nil
+}
+
+// node is a dependency injection node.
+type node struct {
+	compiler
+	rt   reflect.Type
+	tags Tags
+	// rv value can be shared between nodes
+	// initializing node always need to allocate memory for rv
+	rv *reflect.Value
 }
 
 // String is a string representation of node.
@@ -57,7 +60,9 @@ func (n *node) String() string {
 
 // Build builds value of node.
 func (n *node) Value(s schema) (reflect.Value, error) {
-	if n.rv != nil && n.rv.IsValid() {
+	tracer.Trace("-- %s requested", n)
+	if n.rv.IsValid() {
+		tracer.Trace("-- %s already compiled", n)
 		return *n.rv, nil
 	}
 	nodes, err := n.deps(s)
@@ -79,24 +84,41 @@ func (n *node) Value(s schema) (reflect.Value, error) {
 		tracer.Trace("%s: %s", n.String(), err)
 		return reflect.Value{}, err
 	}
+	// if result value not addr, create pointer for it
+	if !rv.CanAddr() {
+		addr := reflect.New(rv.Type())
+		addr.Elem().Set(rv)
+		rv = addr.Elem()
+	}
 	*n.rv = rv
-	if err := n.populate(s); err != nil {
+	if err := populate(s, *n.rv); err != nil {
 		tracer.Trace("%s: %s", n.String(), err)
 		return reflect.Value{}, err
 	}
 	tracer.Trace("Resolved %s", n.String())
-	return rv, nil
+	return *n.rv, nil
 }
 
 // populate populates node fields.
-func (n *node) populate(s schema) error {
-	iv := *n.rv
-	for i, field := range n.fields() {
-		if iv.Kind() == reflect.Ptr {
-			iv = iv.Elem()
-		}
+func populate(s schema, rv reflect.Value) error {
+	if !rv.IsValid() {
+		panic("node zero result value on populate")
+	}
+	inject, err := canInject(rv.Type())
+	if err != nil {
+		return err
+	}
+	if !inject {
+		return nil
+	}
+	// indirect pointer
+	if rv.Kind() == reflect.Ptr {
+		rv = reflect.Indirect(rv)
+	}
+	for index, field := range parsePopulateFields(rv.Type()) {
 		node, err := s.find(field.rt, field.tags)
 		if err != nil && field.optional {
+			tracer.Trace("-- Skip optional field: %s", field)
 			continue
 		}
 		if err != nil {
@@ -106,20 +128,11 @@ func (n *node) populate(s schema) error {
 		if err != nil {
 			return err
 		}
-		iv.Field(i).Set(v)
+		f := rv.Field(index)
+		if !f.CanSet() {
+			panic(fmt.Sprintf("can not set field %s(%d) of %s (addr: %t)", f.Type(), f.Pointer(), rv.Type(), rv.CanAddr()))
+		}
+		f.Set(v)
 	}
 	return nil
-}
-
-// getFunctionNodes
-func getFunctionNodes(fn function, s schema) (params []*node, err error) {
-	for i := 0; i < fn.NumIn(); i++ {
-		in := fn.Type.In(i)
-		node, err := s.find(in, Tags{})
-		if err != nil {
-			return nil, err
-		}
-		params = append(params, node)
-	}
-	return params, nil
 }

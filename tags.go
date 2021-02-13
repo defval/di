@@ -30,15 +30,9 @@ func (t Tags) isTaggable() {
 	bug()
 }
 
-// isTaggable checks that typ is taggable
-func isTaggable(typ reflect.Type) bool {
-	if typ.Kind() == reflect.Ptr && typ.Elem().Kind() == reflect.Struct {
-		return typ.Implements(iTaggable)
-	}
-	if typ.Kind() == reflect.Struct {
-		return typ.Implements(iTaggable)
-	}
-	return false
+// haveTags checks that typ is taggable
+func haveTags(typ reflect.Type) bool {
+	return typ.Implements(iTaggable)
 }
 
 func (t Tags) applyProvide(params *ProvideParams) {
