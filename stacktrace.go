@@ -13,9 +13,6 @@ func stacktrace(skip int) (frame callerFrame) {
 		return callerFrame{}
 	}
 	f := runtime.FuncForPC(pc)
-	if f == nil {
-		return callerFrame{}
-	}
 	return callerFrame{
 		function: shortFuncName(f),
 		file:     file,
