@@ -3,8 +3,6 @@ package di
 import (
 	"errors"
 	"fmt"
-
-	"github.com/goava/di/internal/stacktrace"
 )
 
 var (
@@ -30,7 +28,7 @@ func knownError(err error) bool {
 }
 
 func errWithStack(err error) error {
-	return fmt.Errorf("%s: %w", stacktrace.CallerFrame(1), err)
+	return fmt.Errorf("%s: %w", stacktrace(1), err)
 }
 
 func bug() {

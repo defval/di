@@ -1,4 +1,4 @@
-package stacktrace
+package di
 
 import (
 	"fmt"
@@ -6,32 +6,29 @@ import (
 	"strings"
 )
 
-// CallerFrame returns stacktrace call frame with skip.
-func CallerFrame(skip int) (frame Frame) {
+// stacktrace returns stacktrace call frame with skip.
+func stacktrace(skip int) (frame callerFrame) {
 	pc, file, line, ok := runtime.Caller(skip + 2)
 	if !ok {
-		return Frame{}
+		return callerFrame{}
 	}
 	f := runtime.FuncForPC(pc)
-	if f == nil {
-		return Frame{}
-	}
-	return Frame{
+	return callerFrame{
 		function: shortFuncName(f),
 		file:     file,
 		line:     line,
 	}
 }
 
-// Frame represents stacktrace frame.
-type Frame struct {
+// callerFrame represents stacktrace frame.
+type callerFrame struct {
 	function string
 	file     string
 	line     int
 }
 
 // Format formats stacktrace frame.
-func (f Frame) Format(s fmt.State, c rune) {
+func (f callerFrame) Format(s fmt.State, c rune) {
 	_, _ = fmt.Fprintf(s, "%s:%d", f.file, f.line)
 }
 

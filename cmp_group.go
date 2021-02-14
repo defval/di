@@ -24,7 +24,3 @@ func (c *groupCompiler) deps(s schema) (deps []*node, err error) {
 func (c *groupCompiler) compile(dependencies []reflect.Value, s schema) (reflect.Value, error) {
 	return reflect.Append(reflect.New(c.rt).Elem(), dependencies...), nil
 }
-
-func (c *groupCompiler) fields() map[int]field {
-	return nil
-}

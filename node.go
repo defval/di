@@ -17,9 +17,6 @@ func newConstructorNode(ctor interface{}) (*node, error) {
 	}
 	// result type
 	rt := f.Out(0)
-	if _, err := canInject(rt); err != nil {
-		return nil, err
-	}
 	tags := map[string]string{}
 	if haveTags(rt) {
 		tmp := rt
@@ -60,22 +57,15 @@ func (n *node) String() string {
 
 // Build builds value of node.
 func (n *node) Value(s schema) (reflect.Value, error) {
-	tracer.Trace("-- %s requested", n)
 	if n.rv.IsValid() {
-		tracer.Trace("-- %s already compiled", n)
 		return *n.rv, nil
 	}
-	nodes, err := n.deps(s)
-	if err != nil {
-		tracer.Trace("%s: %s", n.String(), err)
-		return reflect.Value{}, err
-	}
+	nodes, _ := n.deps(s) // todo: error skipped, prepare already check dependency graph
 	var dependencies []reflect.Value
 	for _, node := range nodes {
 		v, err := node.Value(s)
 		if err != nil {
-			tracer.Trace("%s: %s", n.String(), err)
-			return reflect.Value{}, err
+			return reflect.Value{}, fmt.Errorf("%s: %w", node, err)
 		}
 		dependencies = append(dependencies, v)
 	}
@@ -99,16 +89,13 @@ func (n *node) Value(s schema) (reflect.Value, error) {
 	return *n.rv, nil
 }
 
+func (n *node) fields() map[int]field {
+	return parsePopulateFields(n.rt)
+}
+
 // populate populates node fields.
 func populate(s schema, rv reflect.Value) error {
-	if !rv.IsValid() {
-		panic("node zero result value on populate")
-	}
-	inject, err := canInject(rv.Type())
-	if err != nil {
-		return err
-	}
-	if !inject {
+	if !canInject(rv.Type()) {
 		return nil
 	}
 	// indirect pointer

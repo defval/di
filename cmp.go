@@ -10,6 +10,4 @@ type compiler interface {
 	deps(s schema) ([]*node, error)
 	// compile compiles node. The dependencies are already compiled dependencies of this type.
 	compile(dependencies []reflect.Value, s schema) (reflect.Value, error)
-	// fields return types that must be injected into compiled structure.
-	fields() map[int]field
 }

@@ -55,15 +55,11 @@ func (s *defaultSchema) find(t reflect.Type, tags Tags) (*node, error) {
 		}
 		return matched[0], nil
 	}
-	inject, err := canInject(t)
-	if err != nil {
-		return nil, err
-	}
 	// if not a group and not have di.Inject
-	if t.Kind() != reflect.Slice && !inject {
+	if t.Kind() != reflect.Slice && !canInject(t) {
 		return nil, fmt.Errorf("type %s%s %w", t, tags, ErrTypeNotExists)
 	}
-	if inject {
+	if canInject(t) {
 		// constructor result with di.Inject - only addressable pointers
 		// anonymous parameters with di.Inject - only struct
 		//if t.Kind() == reflect.Ptr {

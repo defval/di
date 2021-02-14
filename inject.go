@@ -37,27 +37,22 @@ type field struct {
 }
 
 // canInject checks that type t contain di.Inject and supports injecting.
-func canInject(t reflect.Type) (bool, error) {
+func canInject(t reflect.Type) bool {
 	if !t.Implements(injectableInterface) {
-		return false, nil
+		return false
 	}
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
 	if t.Kind() != reflect.Struct {
-		return false, nil
+		return false
 	}
-	return true, nil
+	return true
 }
 
 // parsePopulateFields parses fields of struct that can be populated.
 func parsePopulateFields(rt reflect.Type) map[int]field {
-	inject, err := canInject(rt)
-	if err != nil {
-		// shouldn't be called
-		panic(err)
-	}
-	if !inject {
+	if !canInject(rt) {
 		return nil
 	}
 	var rv reflect.Value

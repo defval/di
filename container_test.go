@@ -163,7 +163,7 @@ func TestContainer_Resolve(t *testing.T) {
 		require.Contains(t, err.Error(), ": target must be a pointer, got nil")
 	})
 
-	t.Run("resolve into struct cause error", func(t *testing.T) {
+	t.Run("resolve into struct{} cause error", func(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)
 		require.NotNil(t, c)
@@ -197,6 +197,40 @@ func TestContainer_Resolve(t *testing.T) {
 		require.Contains(t, err.Error(), ": *http.Server: server build failed")
 	})
 
+	t.Run("resolve with failed dependency build", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		err = c.Provide(func() (*http.Server, error) {
+			return &http.Server{}, fmt.Errorf("server build failed")
+		})
+		err = c.Provide(func(server *http.Server) string {
+			return "string"
+		})
+		require.NoError(t, err)
+		var s string
+		err = c.Resolve(&s)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "container_test.go:")
+		require.Contains(t, err.Error(), ": *http.Server: server build failed")
+	})
+
+	t.Run("resolve cleanup error", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		called := false
+		cleanup := func() {
+			called = true
+		}
+		require.NoError(t, c.Provide(func() (*http.Server, func(), error) {
+			return &http.Server{}, cleanup, nil
+		}))
+		var server *http.Server
+		require.NoError(t, c.Resolve(&server))
+		c.Cleanup()
+		require.True(t, called)
+	})
+
 	t.Run("resolve returns type that was created in constructor", func(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)
@@ -218,6 +252,18 @@ func TestContainer_Resolve(t *testing.T) {
 		var server2 *http.Server
 		require.NoError(t, c.Resolve(&server2))
 		require.Equal(t, fmt.Sprintf("%p", server1), fmt.Sprintf("%p", server2))
+	})
+
+	t.Run("resolve not existing dependency cause error", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		err = c.Provide(func(handler http.Handler) *http.Server { return &http.Server{} })
+		require.NoError(t, err)
+		var server *http.Server
+		err = c.Resolve(&server)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "container_test.go:")
+		require.Contains(t, err.Error(), "*http.Server: type http.Handler not exists in the container")
 	})
 
 	t.Run("resolve not existing type cause error", func(t *testing.T) {
@@ -707,6 +753,16 @@ func TestContainer_Invoke(t *testing.T) {
 		require.Contains(t, err.Error(), "container_test.go:")
 		require.Contains(t, err.Error(), ": invalid invocation signature, got nil")
 	})
+
+	t.Run("invoke non function type", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		err = c.Invoke(1)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "container_test.go:")
+		require.Contains(t, err.Error(), ": invalid invocation signature, got int")
+	})
+
 	t.Run("invoke invalid function", func(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)
@@ -715,6 +771,7 @@ func TestContainer_Invoke(t *testing.T) {
 		require.Contains(t, err.Error(), "container_test.go:")
 		require.Contains(t, err.Error(), ": invalid invocation signature, got func() *http.Server")
 	})
+
 	t.Run("invocation function with not provided dependency cause error", func(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)
@@ -722,6 +779,15 @@ func TestContainer_Invoke(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "container_test.go:")
 		require.Contains(t, err.Error(), ": type *http.Server not exists in the container")
+	})
+
+	t.Run("invocation function with dependency that can't be constructed", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		err = c.Provide(func() (*http.Server, error) { return nil, fmt.Errorf("server error") })
+		require.NoError(t, err)
+		err = c.Invoke(func(server *http.Server) {})
+		require.EqualError(t, err, "*http.Server: server error")
 	})
 
 	t.Run("invoke with nil error must be called", func(t *testing.T) {
@@ -959,6 +1025,22 @@ func TestContainer_Inject(t *testing.T) {
 		require.NoError(t, c.Resolve(&nit))
 		require.NotNil(t, nit)
 		require.Equal(t, fmt.Sprintf("%p", mux), fmt.Sprintf("%p", nit.Mux))
+	})
+
+	t.Run("cycle in injectable fields cause error", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		type InjectableType struct {
+			di.Inject
+			String string
+		}
+		require.NoError(t, c.Provide(func() *InjectableType { return &InjectableType{} }))
+		require.NoError(t, c.Provide(func(t *InjectableType) string { return "" }))
+		var result *InjectableType
+		err = c.Resolve(&result)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "container_test.go:")
+		require.Contains(t, err.Error(), ": cycle detected")
 	})
 
 	t.Run("optional parameter may be nil", func(t *testing.T) {
