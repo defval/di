@@ -707,6 +707,16 @@ func TestContainer_Invoke(t *testing.T) {
 		require.Contains(t, err.Error(), "container_test.go:")
 		require.Contains(t, err.Error(), ": invalid invocation signature, got nil")
 	})
+
+	t.Run("invoke non function type", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		err = c.Invoke(1)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "container_test.go:")
+		require.Contains(t, err.Error(), ": invalid invocation signature, got int")
+	})
+
 	t.Run("invoke invalid function", func(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)
@@ -715,6 +725,7 @@ func TestContainer_Invoke(t *testing.T) {
 		require.Contains(t, err.Error(), "container_test.go:")
 		require.Contains(t, err.Error(), ": invalid invocation signature, got func() *http.Server")
 	})
+
 	t.Run("invocation function with not provided dependency cause error", func(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)
@@ -722,6 +733,15 @@ func TestContainer_Invoke(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "container_test.go:")
 		require.Contains(t, err.Error(), ": type *http.Server not exists in the container")
+	})
+
+	t.Run("invocation function with dependency that can't be constructed", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		err = c.Provide(func() (*http.Server, error) { return nil, fmt.Errorf("server error") })
+		require.NoError(t, err)
+		err = c.Invoke(func(server *http.Server) {})
+		require.EqualError(t, err, "*http.Server: server error")
 	})
 
 	t.Run("invoke with nil error must be called", func(t *testing.T) {

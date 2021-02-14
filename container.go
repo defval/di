@@ -188,10 +188,10 @@ func (c *Container) invoke(invocation Invocation, _ ...InvokeOption) error {
 	}
 	fn, valid := inspectFunction(invocation)
 	if !valid {
-		return fmt.Errorf("%w, got %s", errInvalidInvocationSignature, fn.Type)
+		return fmt.Errorf("%w, got %s", errInvalidInvocationSignature, reflect.TypeOf(invocation))
 	}
 	if !validateInvocation(fn) {
-		return fmt.Errorf("%w, got %s", errInvalidInvocationSignature, fn.Type)
+		return fmt.Errorf("%w, got %s", errInvalidInvocationSignature, reflect.TypeOf(invocation))
 	}
 	nodes, err := parseInvocationParameters(fn, c.schema)
 	if err != nil {
@@ -204,7 +204,7 @@ func (c *Container) invoke(invocation Invocation, _ ...InvokeOption) error {
 		}
 		v, err := node.Value(c.schema)
 		if err != nil {
-			return err
+			return fmt.Errorf("%s: %s", node, err)
 		}
 		args = append(args, v)
 	}

@@ -30,7 +30,3 @@ func (c typeCompiler) compile(dependencies []reflect.Value, s schema) (reflect.V
 	}
 	return reflect.New(c.rt).Elem(), nil
 }
-
-func (c *typeCompiler) fields() map[int]field {
-	return parsePopulateFields(c.rt)
-}

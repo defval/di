@@ -99,6 +99,10 @@ func (n *node) Value(s schema) (reflect.Value, error) {
 	return *n.rv, nil
 }
 
+func (n *node) fields() map[int]field {
+	return parsePopulateFields(n.rt)
+}
+
 // populate populates node fields.
 func populate(s schema, rv reflect.Value) error {
 	if !rv.IsValid() {

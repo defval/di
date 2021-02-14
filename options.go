@@ -1,9 +1,5 @@
 package di
 
-import (
-	"github.com/goava/di/internal/stacktrace"
-)
-
 // Option is a functional option that configures container. If you don't know about functional
 // options, see https://dave.cheney.net/2014/10/17/functional-options-for-friendly-apis.
 // Below presented all possible options with their description:
@@ -19,7 +15,7 @@ type Option interface {
 // be invoked lazily on-demand. For more information about constructors see Constructor interface. ProvideOption can
 // add additional behavior to the process of type resolving.
 func Provide(constructor Constructor, options ...ProvideOption) Option {
-	frame := stacktrace.CallerFrame(0)
+	frame := stacktrace(0)
 	return option(func(c *Container) {
 		c.initial.provides = append(c.initial.provides, provideOptions{
 			frame,
@@ -124,7 +120,7 @@ func WithName(name string) ProvideOption {
 // Resolve returns container options that resolves type into target. All resolves will be done on compile stage
 // after call invokes.
 func Resolve(target interface{}, options ...ResolveOption) Option {
-	frame := stacktrace.CallerFrame(0)
+	frame := stacktrace(0)
 	return option(func(c *Container) {
 		c.initial.resolves = append(c.initial.resolves, resolveOptions{
 			frame,
@@ -138,7 +134,7 @@ func Resolve(target interface{}, options ...ResolveOption) Option {
 // will be called on di.New() after processing di.Provide() options.
 // See Container.Invoke() for details.
 func Invoke(fn Invocation, options ...InvokeOption) Option {
-	frame := stacktrace.CallerFrame(0)
+	frame := stacktrace(0)
 	return option(func(c *Container) {
 		c.initial.invokes = append(c.initial.invokes, invokeOptions{
 			frame,
@@ -243,21 +239,21 @@ func (o resolveOption) applyResolve(params *ResolveParams) {
 
 // struct that contains constructor with options.
 type provideOptions struct {
-	frame       stacktrace.Frame
+	frame       callerFrame
 	constructor Constructor
 	options     []ProvideOption
 }
 
 // struct that contains invoke function with options.
 type invokeOptions struct {
-	frame   stacktrace.Frame
+	frame   callerFrame
 	fn      Invocation
 	options []InvokeOption
 }
 
 // struct that container resolve target with options.
 type resolveOptions struct {
-	frame   stacktrace.Frame
+	frame   callerFrame
 	target  interface{}
 	options []ResolveOption
 }
