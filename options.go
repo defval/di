@@ -25,6 +25,18 @@ func Provide(constructor Constructor, options ...ProvideOption) Option {
 	})
 }
 
+// ProvideValue provides value as is.
+func ProvideValue(value Value, options ...ProvideOption) Option {
+	frame := stacktrace(0)
+	return option(func(c *diopts) {
+		c.values = append(c.values, provideValueOptions{
+			frame,
+			value,
+			options,
+		})
+	})
+}
+
 // Constructor is a function with follow signature:
 //
 // 	func NewHTTPServer(addr string, handler http.Handler) (server *http.Server, cleanup func(), err error) {
@@ -43,6 +55,9 @@ func Provide(constructor Constructor, options ...ProvideOption) Option {
 // Second result of this function is a optional cleanup callback. It describes that container will do on shutdown.
 // Third result is a optional error. Sometimes our types cannot be constructed.
 type Constructor interface{}
+
+// Value
+type Value interface{}
 
 // ProvideOption is a functional option interface that modify provide behaviour. See di.As(), di.WithName().
 type ProvideOption interface {
@@ -242,6 +257,13 @@ type provideOptions struct {
 	frame       callerFrame
 	constructor Constructor
 	options     []ProvideOption
+}
+
+// struct that contains value with options.
+type provideValueOptions struct {
+	frame   callerFrame
+	value   Value
+	options []ProvideOption
 }
 
 // struct that contains invoke function with options.

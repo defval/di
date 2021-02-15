@@ -152,6 +152,60 @@ func TestContainer_Provide(t *testing.T) {
 	})
 }
 
+func TestContainer_ProvideValue(t *testing.T) {
+	t.Run("provide nil value cause error", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		err = c.ProvideValue(nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "container_test.go:")
+		require.Contains(t, err.Error(), "invalid value, got nil")
+	})
+
+	t.Run("provide and resolve value", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		mux := &http.ServeMux{}
+		err = c.ProvideValue(mux, di.As(new(http.Handler)))
+		require.NoError(t, err)
+		err = c.Provide(func(handler http.Handler) *http.Server {
+			return &http.Server{
+				Handler: handler,
+			}
+		})
+		require.NoError(t, err)
+		var server *http.Server
+		err = c.Resolve(&server)
+		require.NoError(t, err)
+		require.Equal(t, fmt.Sprintf("%p", mux), fmt.Sprintf("%p", server.Handler))
+	})
+
+	t.Run("provide values by option", func(t *testing.T) {
+		mux := &http.ServeMux{}
+		c, err := di.New(
+			di.ProvideValue(mux),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		var result *http.ServeMux
+		err = c.Resolve(&result)
+		require.NoError(t, err)
+		require.Equal(t, fmt.Sprintf("%p", mux), fmt.Sprintf("%p", result))
+	})
+
+	t.Run("provide nil value by option", func(t *testing.T) {
+		c, err := di.New(
+			di.ProvideValue(nil),
+		)
+		require.Error(t, err)
+		require.Nil(t, c)
+		require.Contains(t, err.Error(), "container_test.go:")
+		require.Contains(t, err.Error(), "invalid value, got nil")
+	})
+}
+
 func TestContainer_Resolve(t *testing.T) {
 	t.Run("resolve into nil cause error", func(t *testing.T) {
 		c, err := di.New()

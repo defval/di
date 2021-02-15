@@ -17,6 +17,8 @@ type Container struct {
 type diopts struct {
 	// Array of di.Provide() options.
 	provides []provideOptions
+	// Array of di.ProvideValue() options.
+	values []provideValueOptions
 	// Array of di.Invoke() options.
 	invokes []invokeOptions
 	// Array of di.Resolve() options.
@@ -79,6 +81,11 @@ func (c *Container) Apply(options ...Option) error {
 }
 
 func (c *Container) apply(di diopts) error {
+	for _, provide := range di.values {
+		if err := c.provideValue(provide.value, provide.options...); err != nil {
+			return fmt.Errorf("%s: %w", provide.frame, err)
+		}
+	}
 	// process di.Resolve() diopts
 	for _, provide := range di.provides {
 		if err := c.provide(provide.constructor, provide.options...); err != nil {
@@ -115,12 +122,39 @@ func (c *Container) Provide(constructor Constructor, options ...ProvideOption) e
 	return nil
 }
 
+// ProvideValue provides value as is.
+func (c *Container) ProvideValue(value Value, options ...ProvideOption) error {
+	if err := c.provideValue(value, options...); err != nil {
+		return errWithStack(err)
+	}
+	return nil
+}
+
+func (c *Container) provideValue(value Value, options ...ProvideOption) error {
+	if value == nil {
+		return fmt.Errorf("invalid value, got nil")
+	}
+	params := ProvideParams{}
+	// apply provide diopts
+	for _, opt := range options {
+		opt.applyProvide(&params)
+	}
+	v := reflect.ValueOf(value)
+	n := &node{
+		compiler: nopCompiler{},
+		rt:       v.Type(),
+		tags:     params.Tags,
+		rv:       &v,
+	}
+	return c.provideNode(n, params)
+}
+
 func (c *Container) provide(constructor Constructor, options ...ProvideOption) error {
 	if constructor == nil {
 		return fmt.Errorf("invalid constructor signature, got nil")
 	}
 	params := ProvideParams{}
-	// apply provide diopts
+	// apply provide options
 	for _, opt := range options {
 		opt.applyProvide(&params)
 	}
@@ -131,6 +165,10 @@ func (c *Container) provide(constructor Constructor, options ...ProvideOption) e
 	for k, v := range params.Tags {
 		n.tags[k] = v
 	}
+	return c.provideNode(n, params)
+}
+
+func (c *Container) provideNode(n *node, params ProvideParams) error {
 	c.schema.register(n)
 	// register interfaces
 	for _, cur := range params.Interfaces {
