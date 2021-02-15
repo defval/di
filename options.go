@@ -8,7 +8,7 @@ package di
 //	- di.Invoke - add invocations
 //	- di.Resolve - resolves type
 type Option interface {
-	apply(c *Container)
+	apply(c *diopts)
 }
 
 // Provide returns container option that provides to container reliable way to build type. The constructor will
@@ -16,8 +16,8 @@ type Option interface {
 // add additional behavior to the process of type resolving.
 func Provide(constructor Constructor, options ...ProvideOption) Option {
 	frame := stacktrace(0)
-	return option(func(c *Container) {
-		c.initial.provides = append(c.initial.provides, provideOptions{
+	return option(func(c *diopts) {
+		c.provides = append(c.provides, provideOptions{
 			frame,
 			constructor,
 			options,
@@ -121,8 +121,8 @@ func WithName(name string) ProvideOption {
 // after call invokes.
 func Resolve(target interface{}, options ...ResolveOption) Option {
 	frame := stacktrace(0)
-	return option(func(c *Container) {
-		c.initial.resolves = append(c.initial.resolves, resolveOptions{
+	return option(func(c *diopts) {
+		c.resolves = append(c.resolves, resolveOptions{
 			frame,
 			target,
 			options,
@@ -135,8 +135,8 @@ func Resolve(target interface{}, options ...ResolveOption) Option {
 // See Container.Invoke() for details.
 func Invoke(fn Invocation, options ...InvokeOption) Option {
 	frame := stacktrace(0)
-	return option(func(c *Container) {
-		c.initial.invokes = append(c.initial.invokes, invokeOptions{
+	return option(func(c *diopts) {
+		c.invokes = append(c.invokes, invokeOptions{
 			frame,
 			fn,
 			options,
@@ -162,7 +162,7 @@ func Invoke(fn Invocation, options ...InvokeOption) Option {
 //     // handle error
 //   }
 func Options(options ...Option) Option {
-	return option(func(container *Container) {
+	return option(func(container *diopts) {
 		for _, opt := range options {
 			opt.apply(container)
 		}
@@ -221,9 +221,9 @@ func (p ResolveParams) applyResolve(params *ResolveParams) {
 	*params = p
 }
 
-type option func(c *Container)
+type option func(c *diopts)
 
-func (o option) apply(c *Container) { o(c) }
+func (o option) apply(c *diopts) { o(c) }
 
 type provideOption func(params *ProvideParams)
 

@@ -10,19 +10,17 @@ import (
 type Container struct {
 	// Dependency injection schema.
 	schema *defaultSchema
-	// Initial options will be processed on di.New().
-	initial struct {
-		// Array of di.Provide() options.
-		provides []provideOptions
-		// Array of di.Invoke() options.
-		invokes []invokeOptions
-		// Array of di.Resolve() options.
-		resolves []resolveOptions
-	}
 	// Array of provider cleanups.
 	cleanups []func()
-	// Flag indicates acyclic verification state
-	//verified map[key]bool
+}
+
+type diopts struct {
+	// Array of di.Provide() options.
+	provides []provideOptions
+	// Array of di.Invoke() options.
+	invokes []invokeOptions
+	// Array of di.Resolve() options.
+	resolves []resolveOptions
 }
 
 // New constructs container with provided options. Example usage (simplified):
@@ -58,36 +56,53 @@ func New(options ...Option) (_ *Container, err error) {
 		schema:   newDefaultSchema(),
 		cleanups: []func(){},
 	}
-	// apply container options
+	var di diopts
+	// apply container diopts
 	for _, opt := range options {
-		opt.apply(c)
-	}
-	// process di.Resolve() options
-	for _, provide := range c.initial.provides {
-		if err := c.provide(provide.constructor, provide.options...); err != nil {
-			return nil, fmt.Errorf("%s: %w", provide.frame, err)
-		}
+		opt.apply(&di)
 	}
 	// provide container to advanced usage e.g. condition providing
 	_ = c.provide(func() *Container { return c })
-	// error omitted because if logger could not be resolved it will be default
-	// process di.Invoke() options
-	for _, invoke := range c.initial.invokes {
-		err := c.invoke(invoke.fn, invoke.options...)
-		if err != nil && knownError(err) {
-			return nil, fmt.Errorf("%s: %w", invoke.frame, err)
-		}
-		if err != nil {
-			return nil, err
-		}
-	}
-	// process di.Resolve() options
-	for _, resolve := range c.initial.resolves {
-		if err := c.resolve(resolve.target, resolve.options...); err != nil {
-			return nil, fmt.Errorf("%s: %w", resolve.frame, err)
-		}
+	if err := c.apply(di); err != nil {
+		return nil, err
 	}
 	return c, nil
+}
+
+// Apply
+func (c *Container) Apply(options ...Option) error {
+	var di diopts
+	for _, opt := range options {
+		opt.apply(&di)
+	}
+	return c.apply(di)
+}
+
+func (c *Container) apply(di diopts) error {
+	// process di.Resolve() diopts
+	for _, provide := range di.provides {
+		if err := c.provide(provide.constructor, provide.options...); err != nil {
+			return fmt.Errorf("%s: %w", provide.frame, err)
+		}
+	}
+	// error omitted because if logger could not be resolved it will be default
+	// process di.Invoke() diopts
+	for _, invoke := range di.invokes {
+		err := c.invoke(invoke.fn, invoke.options...)
+		if err != nil && knownError(err) {
+			return fmt.Errorf("%s: %w", invoke.frame, err)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	// process di.Resolve() diopts
+	for _, resolve := range di.resolves {
+		if err := c.resolve(resolve.target, resolve.options...); err != nil {
+			return fmt.Errorf("%s: %w", resolve.frame, err)
+		}
+	}
+	return nil
 }
 
 // Provide provides to container reliable way to build type. The constructor will be invoked lazily on-demand.
@@ -105,7 +120,7 @@ func (c *Container) provide(constructor Constructor, options ...ProvideOption) e
 		return fmt.Errorf("invalid constructor signature, got nil")
 	}
 	params := ProvideParams{}
-	// apply provide options
+	// apply provide diopts
 	for _, opt := range options {
 		opt.applyProvide(&params)
 	}
@@ -180,7 +195,7 @@ func (c *Container) Invoke(invocation Invocation, options ...InvokeOption) error
 
 func (c *Container) invoke(invocation Invocation, _ ...InvokeOption) error {
 	// params := InvokeParams{}
-	// for _, opt := range options {
+	// for _, opt := range diopts {
 	// 	opt.apply(&params)
 	// }
 	if invocation == nil {
@@ -282,7 +297,7 @@ func (c *Container) find(ptr Pointer, options ...ResolveOption) (*node, error) {
 		return nil, fmt.Errorf("target must be a pointer, got %s", reflect.TypeOf(ptr))
 	}
 	params := ResolveParams{}
-	// apply extract options
+	// apply extract diopts
 	for _, opt := range options {
 		opt.applyResolve(&params)
 	}

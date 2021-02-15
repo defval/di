@@ -350,6 +350,24 @@ func TestContainer_Resolve(t *testing.T) {
 	})
 }
 
+func TestContainer_Apply(t *testing.T) {
+	t.Run("apply applies container options with error", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		err = c.Apply(
+			di.Provide(func() *http.Server { return &http.Server{} }, di.As(new(io.Closer))),
+			di.Provide(func() *os.File { return &os.File{} }, di.As(new(io.Closer))),
+		)
+		require.NoError(t, err)
+		var closer io.Closer
+		err = c.Resolve(&closer)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "container_test.go:")
+		require.Contains(t, err.Error(), ": multiple definitions of io.Closer, maybe you need to use group type: []io.Closer")
+	})
+}
+
 func TestContainer_Interfaces(t *testing.T) {
 	t.Run("resolve interface with several implementations cause error", func(t *testing.T) {
 		c, err := di.New(
