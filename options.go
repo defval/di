@@ -132,6 +132,18 @@ func WithName(name string) ProvideOption {
 	})
 }
 
+// Decorator can modify container instance.
+// EXPERIMENTAL FEATURE: functional can be changed.
+type Decorator func(value Value) error
+
+// Decorate will be called after type construction.
+// EXPERIMENTAL FEATURE: functional can be changed.
+func Decorate(decorators ...Decorator) ProvideOption {
+	return provideOption(func(params *ProvideParams) {
+		params.Decorators = append(params.Decorators, decorators...)
+	})
+}
+
 // Resolve returns container options that resolves type into target. All resolves will be done on compile stage
 // after call invokes.
 func Resolve(target interface{}, options ...ResolveOption) Option {
@@ -189,6 +201,7 @@ func Options(options ...Option) Option {
 type ProvideParams struct {
 	Tags       Tags
 	Interfaces []Interface
+	Decorators []Decorator
 }
 
 func (p ProvideParams) applyProvide(params *ProvideParams) {

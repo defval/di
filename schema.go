@@ -41,6 +41,15 @@ func (s *defaultSchema) register(n *node) {
 	s.nodes[n.rt] = append(s.nodes[n.rt], n)
 }
 
+// used depth-first topological sort algorithm
+func (s *defaultSchema) prepare(n *node) error {
+	var marks = map[*node]int{}
+	if err := visit(s, n, marks); err != nil {
+		return err
+	}
+	return nil
+}
+
 // find finds provideFunc by its reflect.Type and Tags.
 func (s *defaultSchema) find(t reflect.Type, tags Tags) (*node, error) {
 	nodes, ok := s.nodes[t]

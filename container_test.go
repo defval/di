@@ -378,6 +378,18 @@ func TestContainer_Resolve(t *testing.T) {
 		require.Contains(t, err.Error(), ": cycle detected") // todo: improve message
 	})
 
+	//t.Run("first resolve checks graph correctness", func(t *testing.T) {
+	//	c, err := di.New()
+	//	require.NoError(t, err)
+	//	err = c.Provide(func(handler http.Handler) *http.Server { return &http.Server{Handler: handler} })
+	//	require.NoError(t, err)
+	//	err = c.Provide(func() string { return "" })
+	//	require.NoError(t, err)
+	//	var s string
+	//	err = c.Resolve(&s)
+	//	require.EqualError(t, err, "")
+	//})
+
 	t.Run("resolve not existing dependency type cause error", func(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)
@@ -404,6 +416,115 @@ func TestContainer_Resolve(t *testing.T) {
 	})
 }
 
+func TestContainer_Decorate(t *testing.T) {
+	t.Run("decorate provide", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		executed := false
+		server := &http.Server{}
+		decorator := func(value di.Value) error {
+			require.Equal(t, fmt.Sprintf("%p", server), fmt.Sprintf("%p", value))
+			executed = true
+			return nil
+		}
+		err = c.Provide(func() *http.Server { return server }, di.Decorate(decorator))
+		require.NoError(t, err)
+		require.False(t, executed)
+		var result *http.Server
+		err = c.Resolve(&result)
+		require.NoError(t, err)
+		require.True(t, executed)
+	})
+
+	t.Run("decorate provide value", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		executed := false
+		server := &http.Server{}
+		err = c.ProvideValue(server, di.Decorate(func(value di.Value) error {
+			require.Equal(t, fmt.Sprintf("%p", server), fmt.Sprintf("%p", value))
+			executed = true
+			return nil
+		}))
+		require.NoError(t, err)
+		require.False(t, executed)
+		var result *http.Server
+		err = c.Resolve(&result)
+		require.NoError(t, err)
+		require.True(t, executed)
+	})
+
+	t.Run("decorate error", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		executed := false
+		server := &http.Server{}
+		err = c.ProvideValue(server, di.Decorate(func(value di.Value) error {
+			require.Equal(t, fmt.Sprintf("%p", server), fmt.Sprintf("%p", value))
+			executed = true
+			return errors.New("decorate error")
+		}))
+		require.NoError(t, err)
+		require.False(t, executed)
+		var result *http.Server
+		err = c.Resolve(&result)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "container_test.go")
+		require.Contains(t, err.Error(), ": *http.Server: decorate error")
+		require.True(t, executed)
+	})
+
+	t.Run("decorate group", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		executed1 := 0
+		executed2 := 0
+		server1 := &http.Server{}
+		server2 := &http.Server{}
+		err = c.ProvideValue(server1, di.Decorate(func(value di.Value) error {
+			require.Equal(t, fmt.Sprintf("%p", server1), fmt.Sprintf("%p", value))
+			executed1++
+			return nil
+		}))
+		require.NoError(t, err)
+		err = c.ProvideValue(server2, di.Decorate(func(value di.Value) error {
+			require.Equal(t, fmt.Sprintf("%p", server2), fmt.Sprintf("%p", value))
+			executed2++
+			return nil
+		}))
+		require.NoError(t, err)
+		require.Zero(t, executed1)
+		require.Zero(t, executed2)
+		var result []*http.Server
+		err = c.Resolve(&result)
+		require.NoError(t, err)
+		// check that decorate called only once
+		err = c.Resolve(&result)
+		require.NoError(t, err)
+		require.Equal(t, 1, executed1)
+		require.Equal(t, 1, executed2)
+	})
+
+	t.Run("decorate interfaces", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		executed1 := 0
+		server1 := &http.Server{}
+		err = c.ProvideValue(server1, di.Decorate(func(value di.Value) error {
+			require.Equal(t, fmt.Sprintf("%p", server1), fmt.Sprintf("%p", value))
+			executed1++
+			return nil
+		}), di.As(new(io.Closer)))
+		require.NoError(t, err)
+		require.Zero(t, executed1)
+		var result io.Closer
+		err = c.Resolve(&result)
+		require.NoError(t, err)
+		err = c.Resolve(&result)
+		require.NoError(t, err)
+		require.Equal(t, 1, executed1)
+	})
+}
 func TestContainer_Apply(t *testing.T) {
 	t.Run("apply applies container options with error", func(t *testing.T) {
 		c, err := di.New()

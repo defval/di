@@ -9,15 +9,6 @@ const (
 	permanent = 2
 )
 
-// used depth-first topological sort algorithm
-func prepare(s schema, n *node) error {
-	var marks = map[*node]int{}
-	if err := visit(s, n, marks); err != nil {
-		return err
-	}
-	return nil
-}
-
 func visit(s schema, node *node, marks map[*node]int) error {
 	if marks[node] == permanent {
 		return nil

@@ -141,10 +141,13 @@ func (c *Container) provideValue(value Value, options ...ProvideOption) error {
 	}
 	v := reflect.ValueOf(value)
 	n := &node{
-		compiler: nopCompiler{},
-		rt:       v.Type(),
-		tags:     params.Tags,
-		rv:       &v,
+		compiler: valueCompiler{
+			rv: v,
+		},
+		rv:    new(reflect.Value),
+		rt:    v.Type(),
+		tags:  params.Tags,
+		hooks: params.Decorators,
 	}
 	return c.provideNode(n, params)
 }
@@ -162,6 +165,7 @@ func (c *Container) provide(constructor Constructor, options ...ProvideOption) e
 	if err != nil {
 		return err
 	}
+	n.hooks = params.Decorators
 	for k, v := range params.Tags {
 		n.tags[k] = v
 	}
@@ -184,6 +188,7 @@ func (c *Container) provideNode(n *node, params ProvideParams) error {
 			rt:       i.Type,
 			tags:     n.tags,
 			compiler: n.compiler,
+			hooks:    n.hooks,
 		})
 	}
 	return nil
@@ -252,7 +257,7 @@ func (c *Container) invoke(invocation Invocation, _ ...InvokeOption) error {
 	}
 	var args []reflect.Value
 	for _, node := range nodes {
-		if err := prepare(c.schema, node); err != nil {
+		if err := c.schema.prepare(node); err != nil {
 			return err
 		}
 		v, err := node.Value(c.schema)
@@ -343,7 +348,7 @@ func (c *Container) find(ptr Pointer, options ...ResolveOption) (*node, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := prepare(c.schema, node); err != nil {
+	if err := c.schema.prepare(node); err != nil {
 		return nil, err
 	}
 	return node, nil
