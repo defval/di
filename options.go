@@ -137,7 +137,7 @@ func WithName(name string) ProvideOption {
 type Decorator func(value Value) error
 
 // Decorate will be called after type construction.
-// EXPERIMENTAL FEATURE: functional can be changed.
+// EXPERIMENTAL FEATURE: functional can changed.
 func Decorate(decorators ...Decorator) ProvideOption {
 	return provideOption(func(params *ProvideParams) {
 		params.Decorators = append(params.Decorators, decorators...)
