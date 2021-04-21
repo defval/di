@@ -48,8 +48,8 @@ type node struct {
 	// rv value can be shared between nodes
 	// initializing node always need to allocate memory for rv
 	rv *reflect.Value
-	// hooks
-	hooks []Decorator
+	// decorators
+	decorators []Decorator
 }
 
 // String is a string representation of node.
@@ -86,9 +86,9 @@ func (n *node) Value(s schema) (reflect.Value, error) {
 		tracer.Trace("%s: %s", n.String(), err)
 		return reflect.Value{}, err
 	}
-	for _, hook := range n.hooks {
-		tracer.Trace("Run resolve hook for %s", n.String())
-		if err := hook(rv.Interface()); err != nil {
+	for _, decorator := range n.decorators {
+		tracer.Trace("Run resolve decorator for %s", n.String())
+		if err := decorator(rv.Interface()); err != nil {
 			tracer.Trace("Decorator error %s", err)
 			return reflect.Value{}, err
 		}

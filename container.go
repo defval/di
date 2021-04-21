@@ -144,10 +144,10 @@ func (c *Container) provideValue(value Value, options ...ProvideOption) error {
 		compiler: valueCompiler{
 			rv: v,
 		},
-		rv:    new(reflect.Value),
-		rt:    v.Type(),
-		tags:  params.Tags,
-		hooks: params.Decorators,
+		rv:         new(reflect.Value),
+		rt:         v.Type(),
+		tags:       params.Tags,
+		decorators: params.Decorators,
 	}
 	return c.provideNode(n, params)
 }
@@ -165,7 +165,7 @@ func (c *Container) provide(constructor Constructor, options ...ProvideOption) e
 	if err != nil {
 		return err
 	}
-	n.hooks = params.Decorators
+	n.decorators = params.Decorators
 	for k, v := range params.Tags {
 		n.tags[k] = v
 	}
@@ -184,11 +184,11 @@ func (c *Container) provideNode(n *node, params ProvideParams) error {
 			return fmt.Errorf("%s not implement %s", n, i.Type)
 		}
 		c.schema.register(&node{
-			rv:       n.rv,
-			rt:       i.Type,
-			tags:     n.tags,
-			compiler: n.compiler,
-			hooks:    n.hooks,
+			rv:         n.rv,
+			rt:         i.Type,
+			tags:       n.tags,
+			compiler:   n.compiler,
+			decorators: n.decorators,
 		})
 	}
 	return nil
