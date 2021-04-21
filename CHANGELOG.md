@@ -7,6 +7,12 @@ The format is based on
 project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html): TBD, use modules or another vendor system.
 
+## Not released
+
+### Added
+
+- An experimental feature: Instance decoration with `di.Decorate()`.
+
 ## v1.9.0
 
 ### Added
