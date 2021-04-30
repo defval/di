@@ -136,7 +136,7 @@ func WithName(name string) ProvideOption {
 // EXPERIMENTAL FEATURE: functional can be changed.
 type Decorator func(value Value) error
 
-// Decorate will be called after type construction.
+// Decorate will be called after type construction. You can modify your pointer types.
 // EXPERIMENTAL FEATURE: functional can changed.
 func Decorate(decorators ...Decorator) ProvideOption {
 	return provideOption(func(params *ProvideParams) {
@@ -146,7 +146,7 @@ func Decorate(decorators ...Decorator) ProvideOption {
 
 // Resolve returns container options that resolves type into target. All resolves will be done on compile stage
 // after call invokes.
-func Resolve(target interface{}, options ...ResolveOption) Option {
+func Resolve(target Pointer, options ...ResolveOption) Option {
 	frame := stacktrace(0)
 	return option(func(c *diopts) {
 		c.resolves = append(c.resolves, resolveOptions{
@@ -289,6 +289,6 @@ type invokeOptions struct {
 // struct that container resolve target with options.
 type resolveOptions struct {
 	frame   callerFrame
-	target  interface{}
+	target  Pointer
 	options []ResolveOption
 }

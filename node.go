@@ -57,7 +57,7 @@ func (n *node) String() string {
 	return fmt.Sprintf("%s%s", n.rt, n.tags)
 }
 
-// Build builds value of node.
+// Value returns value of node.
 func (n *node) Value(s schema) (reflect.Value, error) {
 	if n.rv.IsValid() {
 		return *n.rv, nil

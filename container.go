@@ -14,17 +14,6 @@ type Container struct {
 	cleanups []func()
 }
 
-type diopts struct {
-	// Array of di.Provide() options.
-	provides []provideOptions
-	// Array of di.ProvideValue() options.
-	values []provideValueOptions
-	// Array of di.Invoke() options.
-	invokes []invokeOptions
-	// Array of di.Resolve() options.
-	resolves []resolveOptions
-}
-
 // New constructs container with provided options. Example usage (simplified):
 //
 // Define constructors and invocations:
@@ -71,45 +60,20 @@ func New(options ...Option) (_ *Container, err error) {
 	return c, nil
 }
 
-// Apply
+// Apply applies options to container.
+//
+// 	err := container.Apply(
+//		di.Provide(NewHTTPServer),
+//	)
+//	if err != nil {
+//		// handle error
+//	}
 func (c *Container) Apply(options ...Option) error {
 	var di diopts
 	for _, opt := range options {
 		opt.apply(&di)
 	}
 	return c.apply(di)
-}
-
-func (c *Container) apply(di diopts) error {
-	for _, provide := range di.values {
-		if err := c.provideValue(provide.value, provide.options...); err != nil {
-			return fmt.Errorf("%s: %w", provide.frame, err)
-		}
-	}
-	// process di.Resolve() diopts
-	for _, provide := range di.provides {
-		if err := c.provide(provide.constructor, provide.options...); err != nil {
-			return fmt.Errorf("%s: %w", provide.frame, err)
-		}
-	}
-	// error omitted because if logger could not be resolved it will be default
-	// process di.Invoke() diopts
-	for _, invoke := range di.invokes {
-		err := c.invoke(invoke.fn, invoke.options...)
-		if err != nil && knownError(err) {
-			return fmt.Errorf("%s: %w", invoke.frame, err)
-		}
-		if err != nil {
-			return err
-		}
-	}
-	// process di.Resolve() diopts
-	for _, resolve := range di.resolves {
-		if err := c.resolve(resolve.target, resolve.options...); err != nil {
-			return fmt.Errorf("%s: %w", resolve.frame, err)
-		}
-	}
-	return nil
 }
 
 // Provide provides to container reliable way to build type. The constructor will be invoked lazily on-demand.
@@ -130,98 +94,16 @@ func (c *Container) ProvideValue(value Value, options ...ProvideOption) error {
 	return nil
 }
 
-func (c *Container) provideValue(value Value, options ...ProvideOption) error {
-	if value == nil {
-		return fmt.Errorf("invalid value, got nil")
-	}
-	params := ProvideParams{}
-	// apply provide diopts
-	for _, opt := range options {
-		opt.applyProvide(&params)
-	}
-	v := reflect.ValueOf(value)
-	n := &node{
-		compiler: valueCompiler{
-			rv: v,
-		},
-		rv:         new(reflect.Value),
-		rt:         v.Type(),
-		tags:       params.Tags,
-		decorators: params.Decorators,
-	}
-	return c.provideNode(n, params)
-}
-
-func (c *Container) provide(constructor Constructor, options ...ProvideOption) error {
-	if constructor == nil {
-		return fmt.Errorf("invalid constructor signature, got nil")
-	}
-	params := ProvideParams{}
-	// apply provide options
-	for _, opt := range options {
-		opt.applyProvide(&params)
-	}
-	n, err := newConstructorNode(constructor)
-	if err != nil {
-		return err
-	}
-	n.decorators = params.Decorators
-	for k, v := range params.Tags {
-		n.tags[k] = v
-	}
-	return c.provideNode(n, params)
-}
-
-func (c *Container) provideNode(n *node, params ProvideParams) error {
-	c.schema.register(n)
-	// register interfaces
-	for _, cur := range params.Interfaces {
-		i, err := inspectInterfacePointer(cur)
-		if err != nil {
-			return err
-		}
-		if !n.rt.Implements(i.Type) {
-			return fmt.Errorf("%s not implement %s", n, i.Type)
-		}
-		c.schema.register(&node{
-			rv:         n.rv,
-			rt:         i.Type,
-			tags:       n.tags,
-			compiler:   n.compiler,
-			decorators: n.decorators,
-		})
-	}
-	return nil
-}
-
-type Pointer interface{}
-
-// Resolve resolves type and fills target pointer.
+// Invocation is a function whose signature looks like:
 //
-//	var server *http.Server
-//	if err := container.Resolve(&server); err != nil {
-//		// handle error
-//	}
-func (c *Container) Resolve(ptr Pointer, options ...ResolveOption) error {
-	if err := c.resolve(ptr, options...); err != nil {
-		return errWithStack(err)
-	}
-	return nil
-}
-
-func (c *Container) resolve(ptr Pointer, options ...ResolveOption) error {
-	node, err := c.find(ptr, options...)
-	if err != nil {
-		return err
-	}
-	value, err := node.Value(c.schema)
-	if err != nil {
-		return fmt.Errorf("%s: %w", node, err)
-	}
-	target := reflect.ValueOf(ptr).Elem()
-	target.Set(value)
-	return nil
-}
+//		func StartServer(server *http.Server) error {
+//			return server.ListenAndServe()
+//		}
+//
+// Like a constructor invocation may have unlimited count of arguments and
+// they will be resolved automatically. The invocation can return an optional error.
+// Error will be returned as is.
+type Invocation interface{}
 
 // Invoke calls the function fn. It parses function parameters. Looks for it in a container.
 // And invokes function with them. See Invocation for details.
@@ -236,42 +118,7 @@ func (c *Container) Invoke(invocation Invocation, options ...InvokeOption) error
 	return nil
 }
 
-func (c *Container) invoke(invocation Invocation, _ ...InvokeOption) error {
-	// params := InvokeParams{}
-	// for _, opt := range diopts {
-	// 	opt.apply(&params)
-	// }
-	if invocation == nil {
-		return fmt.Errorf("%w, got %s", errInvalidInvocationSignature, "nil")
-	}
-	fn, valid := inspectFunction(invocation)
-	if !valid {
-		return fmt.Errorf("%w, got %s", errInvalidInvocationSignature, reflect.TypeOf(invocation))
-	}
-	if !validateInvocation(fn) {
-		return fmt.Errorf("%w, got %s", errInvalidInvocationSignature, reflect.TypeOf(invocation))
-	}
-	nodes, err := parseInvocationParameters(fn, c.schema)
-	if err != nil {
-		return err
-	}
-	var args []reflect.Value
-	for _, node := range nodes {
-		if err := c.schema.prepare(node); err != nil {
-			return err
-		}
-		v, err := node.Value(c.schema)
-		if err != nil {
-			return fmt.Errorf("%s: %s", node, err)
-		}
-		args = append(args, v)
-	}
-	res := funcResult(fn.Call(args))
-	if len(res) == 0 {
-		return nil
-	}
-	return res.error(0)
-}
+type Pointer interface{}
 
 // Has checks that type exists in container, if not it return false.
 //
@@ -288,6 +135,19 @@ func (c *Container) Has(target Pointer, options ...ResolveOption) (bool, error) 
 		return false, err
 	}
 	return true, nil
+}
+
+// Resolve resolves type and fills target pointer.
+//
+//	var server *http.Server
+//	if err := container.Resolve(&server); err != nil {
+//		// handle error
+//	}
+func (c *Container) Resolve(ptr Pointer, options ...ResolveOption) error {
+	if err := c.resolve(ptr, options...); err != nil {
+		return errWithStack(err)
+	}
+	return nil
 }
 
 // ValueFunc is a lazy-loading wrapper for iteration.
@@ -332,6 +192,160 @@ func (c *Container) Iterate(target Pointer, fn IterateFunc, options ...ResolveOp
 	return fmt.Errorf("iteration can be used with groups only")
 }
 
+// Cleanup runs destructors in reverse order that was been created.
+func (c *Container) Cleanup() {
+	for i := len(c.schema.cleanups) - 1; i >= 0; i-- {
+		c.schema.cleanups[i]()
+	}
+}
+
+func (c *Container) apply(di diopts) error {
+	for _, provide := range di.values {
+		if err := c.provideValue(provide.value, provide.options...); err != nil {
+			return fmt.Errorf("%s: %w", provide.frame, err)
+		}
+	}
+	// process di.Resolve() diopts
+	for _, provide := range di.provides {
+		if err := c.provide(provide.constructor, provide.options...); err != nil {
+			return fmt.Errorf("%s: %w", provide.frame, err)
+		}
+	}
+	// error omitted because if logger could not be resolved it will be default
+	// process di.Invoke() diopts
+	for _, invoke := range di.invokes {
+		err := c.invoke(invoke.fn, invoke.options...)
+		if err != nil && knownError(err) {
+			return fmt.Errorf("%s: %w", invoke.frame, err)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	// process di.Resolve() diopts
+	for _, resolve := range di.resolves {
+		if err := c.resolve(resolve.target, resolve.options...); err != nil {
+			return fmt.Errorf("%s: %w", resolve.frame, err)
+		}
+	}
+	return nil
+}
+
+func (c *Container) provide(constructor Constructor, options ...ProvideOption) error {
+	if constructor == nil {
+		return fmt.Errorf("invalid constructor signature, got nil")
+	}
+	params := ProvideParams{}
+	// apply provide options
+	for _, opt := range options {
+		opt.applyProvide(&params)
+	}
+	n, err := newConstructorNode(constructor)
+	if err != nil {
+		return err
+	}
+	n.decorators = params.Decorators
+	for k, v := range params.Tags {
+		n.tags[k] = v
+	}
+	return c.provideNode(n, params)
+}
+
+func (c *Container) provideValue(value Value, options ...ProvideOption) error {
+	if value == nil {
+		return fmt.Errorf("invalid value, got nil")
+	}
+	params := ProvideParams{}
+	// apply provide diopts
+	for _, opt := range options {
+		opt.applyProvide(&params)
+	}
+	v := reflect.ValueOf(value)
+	n := &node{
+		compiler: valueCompiler{
+			rv: v,
+		},
+		rv:         new(reflect.Value),
+		rt:         v.Type(),
+		tags:       params.Tags,
+		decorators: params.Decorators,
+	}
+	return c.provideNode(n, params)
+}
+
+func (c *Container) provideNode(n *node, params ProvideParams) error {
+	c.schema.register(n)
+	// register interfaces
+	for _, cur := range params.Interfaces {
+		i, err := inspectInterfacePointer(cur)
+		if err != nil {
+			return err
+		}
+		if !n.rt.Implements(i.Type) {
+			return fmt.Errorf("%s not implement %s", n, i.Type)
+		}
+		c.schema.register(&node{
+			rv:         n.rv,
+			rt:         i.Type,
+			tags:       n.tags,
+			compiler:   n.compiler,
+			decorators: n.decorators,
+		})
+	}
+	return nil
+}
+
+func (c *Container) resolve(ptr Pointer, options ...ResolveOption) error {
+	node, err := c.find(ptr, options...)
+	if err != nil {
+		return err
+	}
+	value, err := node.Value(c.schema)
+	if err != nil {
+		return fmt.Errorf("%s: %w", node, err)
+	}
+	target := reflect.ValueOf(ptr).Elem()
+	target.Set(value)
+	return nil
+}
+
+func (c *Container) invoke(invocation Invocation, _ ...InvokeOption) error {
+	// params := InvokeParams{}
+	// for _, opt := range diopts {
+	// 	opt.apply(&params)
+	// }
+	if invocation == nil {
+		return fmt.Errorf("%w, got %s", errInvalidInvocationSignature, "nil")
+	}
+	fn, valid := inspectFunction(invocation)
+	if !valid {
+		return fmt.Errorf("%w, got %s", errInvalidInvocationSignature, reflect.TypeOf(invocation))
+	}
+	if !validateInvocation(fn) {
+		return fmt.Errorf("%w, got %s", errInvalidInvocationSignature, reflect.TypeOf(invocation))
+	}
+	nodes, err := parseInvocationParameters(fn, c.schema)
+	if err != nil {
+		return err
+	}
+	var args []reflect.Value
+	for _, node := range nodes {
+		if err := c.schema.prepare(node); err != nil {
+			return err
+		}
+		v, err := node.Value(c.schema)
+		if err != nil {
+			return fmt.Errorf("%s: %s", node, err)
+		}
+		args = append(args, v)
+	}
+	res := funcResult(fn.Call(args))
+	if len(res) == 0 {
+		return nil
+	}
+	return res.error(0)
+}
+
 func (c *Container) find(ptr Pointer, options ...ResolveOption) (*node, error) {
 	if ptr == nil {
 		return nil, fmt.Errorf("target must be a pointer, got nil")
@@ -354,9 +368,13 @@ func (c *Container) find(ptr Pointer, options ...ResolveOption) (*node, error) {
 	return node, nil
 }
 
-// Cleanup runs destructors in reverse order that was been created.
-func (c *Container) Cleanup() {
-	for i := len(c.schema.cleanups) - 1; i >= 0; i-- {
-		c.schema.cleanups[i]()
-	}
+type diopts struct {
+	// Array of di.Provide() options.
+	provides []provideOptions
+	// Array of di.ProvideValue() options.
+	values []provideValueOptions
+	// Array of di.Invoke() options.
+	invokes []invokeOptions
+	// Array of di.Resolve() options.
+	resolves []resolveOptions
 }

@@ -169,6 +169,10 @@ func NewController() *Controller {
 
 TBD
 
+### Decoration
+
+TBD
+
 ### Cleanup
 
 If the constructor creates a value that needs to be cleaned up, then it
