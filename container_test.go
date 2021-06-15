@@ -1188,6 +1188,11 @@ func TestContainer_Inject(t *testing.T) {
 		require.True(t, extracted)
 		var result *InjectableType
 		require.NoError(t, c.Resolve(&result))
+
+		mux := http.NewServeMux()
+		p := InjectableParameter{Skipped: mux}
+		require.NoError(t, c.Resolve(&p))
+		require.Equal(t, InjectableParameter{Skipped: mux}, p)
 	})
 
 	t.Run("resolving not provided injectable cause error", func(t *testing.T) {

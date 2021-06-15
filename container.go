@@ -213,8 +213,18 @@ func (c *Container) resolve(ptr Pointer, options ...ResolveOption) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", node, err)
 	}
-	target := reflect.ValueOf(ptr).Elem()
-	target.Set(value)
+
+	rv := reflect.ValueOf(ptr)
+	target := rv.Elem()
+
+	if canInject(rv.Type()) {
+		for index, _ := range parsePopulateFields(target.Type()) {
+			target.Field(index).Set(value.Field(index))
+		}
+	} else {
+		target.Set(value)
+	}
+
 	return nil
 }
 
