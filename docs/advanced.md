@@ -204,3 +204,22 @@ if err != nil {
 container.Cleanup() // file was closed
 ```
 
+### Container Chains
+You can chain containers together so that values can be resolved from a parent container.  The child 
+
+```go
+parent, err := container.New(
+    di.Provide(NewServer),
+    di.Provide(NewServeMux),
+)
+
+child, err := container.New()
+
+err = child.AddParent(parent)
+if err != nil {
+// handle error
+}
+
+var server *http.Server
+err := child.Resolve(&server)
+```

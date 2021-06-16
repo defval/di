@@ -1311,3 +1311,81 @@ func TestContainer_Cleanup(t *testing.T) {
 		require.Equal(t, []string{"server", "mux"}, cleanupCalls)
 	})
 }
+
+func TestParentContainer(t *testing.T) {
+	t.Run("provide ancestor and resolve in child", func(t *testing.T) {
+
+		papaw, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, papaw)
+		parent, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, parent)
+		child, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, child)
+
+		require.NoError(t, parent.AddParent(papaw))
+		require.NoError(t, child.AddParent(parent))
+
+		conn1 := &net.TCPConn{}
+		require.NoError(t, papaw.Provide(func() *net.TCPConn { return conn1 }))
+
+		var conn *net.TCPConn
+		require.NoError(t, child.Resolve(&conn))
+		require.Equal(t, fmt.Sprintf("%p", conn1), fmt.Sprintf("%p", conn))
+	})
+
+	t.Run("resolve multiple type instances across ancestors", func(t *testing.T) {
+		papaw, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, papaw)
+		parent, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, parent)
+		child, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, child)
+
+		require.NoError(t, parent.AddParent(papaw))
+		require.NoError(t, child.AddParent(parent))
+
+		conn1 := &net.TCPConn{}
+		conn2 := &net.TCPConn{}
+		conn3 := &net.TCPConn{}
+		require.NoError(t, papaw.Provide(func() *net.TCPConn { return conn1 }))
+		require.NoError(t, parent.Provide(func() *net.TCPConn { return conn2 }))
+		require.NoError(t, child.Provide(func() *net.TCPConn { return conn3 }))
+
+		var conns []*net.TCPConn
+		require.NoError(t, child.Resolve(&conns))
+		require.Len(t, conns, 3)
+		require.Equal(t, fmt.Sprintf("%p", conn1), fmt.Sprintf("%p", conns[0]))
+		require.Equal(t, fmt.Sprintf("%p", conn2), fmt.Sprintf("%p", conns[1]))
+		require.Equal(t, fmt.Sprintf("%p", conn3), fmt.Sprintf("%p", conns[2]))
+	})
+
+	t.Run("add parent errors", func(t *testing.T) {
+		parent, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, parent)
+		err = parent.AddParent(parent)
+		require.Contains(t, err.Error(), "self cycle detected")
+		child, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, child)
+		err = child.AddParent(parent)
+		require.NoError(t, err)
+		err = parent.AddParent(child)
+		require.Contains(t, err.Error(), "cycle detected")
+		err = child.AddParent(parent)
+		require.Contains(t, err.Error(), "parent already chained")
+		papaw, err := di.New()
+		require.NoError(t, err)
+		require.NotNil(t, papaw)
+		err = parent.AddParent(papaw)
+		err = papaw.AddParent(child)
+		require.Contains(t, err.Error(), "cycle detected")
+	})
+
+}

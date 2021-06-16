@@ -15,6 +15,7 @@ type schema interface {
 
 // schema is a dependency injection schema.
 type defaultSchema struct {
+	parents  []*defaultSchema
 	nodes    map[reflect.Type][]*node
 	cleanups []func()
 }
@@ -43,7 +44,7 @@ func (s *defaultSchema) register(n *node) {
 
 // find finds provideFunc by its reflect.Type and Tags.
 func (s *defaultSchema) find(t reflect.Type, tags Tags) (*node, error) {
-	nodes, ok := s.nodes[t]
+	nodes, ok := s.list(t)
 	// type found
 	if ok {
 		matched := matchTags(nodes, tags)
@@ -78,7 +79,7 @@ func (s *defaultSchema) find(t reflect.Type, tags Tags) (*node, error) {
 }
 
 func (s *defaultSchema) group(t reflect.Type, tags Tags) (*node, error) {
-	group, ok := s.nodes[t.Elem()]
+	group, ok := s.list(t.Elem())
 	if !ok {
 		return nil, fmt.Errorf("type %s%s %w", t, tags, ErrTypeNotExists)
 	}
@@ -93,4 +94,46 @@ func (s *defaultSchema) group(t reflect.Type, tags Tags) (*node, error) {
 		rv:       new(reflect.Value),
 	}
 	return node, nil
+}
+
+// list lists all the nodes of its reflect.Type
+func (s *defaultSchema) list(t reflect.Type) (nodes []*node, ok bool) {
+	for _, parent := range s.parents {
+		if n, o := parent.list(t); o {
+			nodes = append(nodes, n...)
+			ok = true
+		}
+	}
+	if n, o := s.nodes[t]; o {
+		nodes = append(nodes, n...)
+		ok = true
+	}
+	return nodes, ok
+}
+
+// isAncestor returns true if a
+func (s *defaultSchema) isAncestor(a *defaultSchema) bool {
+	for _, parent := range s.parents {
+		if parent == a {
+			return true
+		}
+		if parent.isAncestor(a) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *defaultSchema) addParent(parent *defaultSchema) error {
+	if parent == s {
+		return fmt.Errorf("self cycle detected")
+	}
+	if parent.isAncestor(s) {
+		return fmt.Errorf("cycle detected")
+	}
+	if s.isAncestor(parent) {
+		return fmt.Errorf("parent already chained")
+	}
+	s.parents = append(s.parents, parent)
+	return nil
 }

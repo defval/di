@@ -122,6 +122,12 @@ func (c *Container) Provide(constructor Constructor, options ...ProvideOption) e
 	return nil
 }
 
+// AddParent adds a parent container. Types are resolved from the container,
+// it's parents, and ancestors.  An error is a cycle is detected in ancestry tree.
+func (c *Container) AddParent(parent *Container) error {
+	return c.schema.addParent(parent.schema)
+}
+
 // ProvideValue provides value as is.
 func (c *Container) ProvideValue(value Value, options ...ProvideOption) error {
 	if err := c.provideValue(value, options...); err != nil {
