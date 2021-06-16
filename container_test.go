@@ -677,6 +677,7 @@ func TestContainer_Tags(t *testing.T) {
 		err = c.Provide(func() *http.Server { return first }, di.WithName("first"))
 		require.NoError(t, err)
 		err = c.Provide(func() *http.Server { return second }, di.WithName("second"))
+		require.NoError(t, err)
 		var extracted *http.Server
 		err = c.Resolve(&extracted)
 		require.Error(t, err)
