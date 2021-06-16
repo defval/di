@@ -92,7 +92,8 @@ func NewService(parameters Parameters) *Service {
 }
 ```
 
-If you need to resolve all types with same tag key, use `*` as tag value:
+If you need to resolve all types with same tag key, use `*` as tag
+value:
 
 ```go
 var db []*Database
@@ -205,7 +206,11 @@ container.Cleanup() // file was closed
 ```
 
 ### Container Chains
-You can chain containers together so that values can be resolved from a parent container.  The child 
+
+You can chain containers together so that values can be resolved from a
+parent container. The child
+
+**Note:** You should cleanup each container manually.
 
 ```go
 parent, err := container.New(
@@ -223,3 +228,4 @@ if err != nil {
 var server *http.Server
 err := child.Resolve(&server)
 ```
+
