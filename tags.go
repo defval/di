@@ -57,7 +57,7 @@ func (t Tags) applyResolve(params *ResolveParams) {
 // String is a tags string representation.
 func (t Tags) String() string {
 	var keys []string
-	for k, _ := range t {
+	for k := range t {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
@@ -70,7 +70,7 @@ func (t Tags) String() string {
 	return "[" + strings.Join(keys, ";") + "]"
 }
 
-// matchTags checks that all of key value pairs exists in t.
+// match checks that all of key value pairs exists in t. Not equal.
 func (t Tags) match(tags Tags) bool {
 	for k, v := range tags {
 		tv, ok := t[k]
@@ -85,11 +85,6 @@ func (t Tags) match(tags Tags) bool {
 		}
 	}
 	return true
-}
-
-// isEmpty returns true if tags empty.
-func (t Tags) isEmpty() bool {
-	return len(t) == 0
 }
 
 func matchTags(nodes []*node, tags Tags) []*node {

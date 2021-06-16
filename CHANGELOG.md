@@ -7,11 +7,16 @@ The format is based on
 project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html): TBD, use modules or another vendor system.
 
-## Not released
+## Not released yet
 
 ### Added
 
+- [@chirino](https://github.com/chirino): Container nesting. See `AddParent()` function ([#35](https://github.com/goava/di/pull/35)).
 - An experimental feature: Instance decoration with `di.Decorate()`.
+
+### Fixed
+
+- [@chirino](https://github.com/chirino): Calling `Resolve()` on a `di.Injectable` would overwrite the skip fields ([#34](https://github.com/goava/di/pull/34)).
 
 ## v1.9.0
 

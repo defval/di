@@ -199,6 +199,12 @@ func (c *Container) Cleanup() {
 	}
 }
 
+// AddParent adds a parent container. Types are resolved from the container,
+// it's parents, and ancestors. An error is a cycle is detected in ancestry tree.
+func (c *Container) AddParent(parent *Container) error {
+	return c.schema.addParent(parent.schema)
+}
+
 func (c *Container) apply(di diopts) error {
 	for _, provide := range di.values {
 		if err := c.provideValue(provide.value, provide.options...); err != nil {
@@ -304,8 +310,15 @@ func (c *Container) resolve(ptr Pointer, options ...ResolveOption) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", node, err)
 	}
-	target := reflect.ValueOf(ptr).Elem()
-	target.Set(value)
+	rv := reflect.ValueOf(ptr)
+	target := rv.Elem()
+	if canInject(rv.Type()) {
+		for index := range parsePopulateFields(target.Type()) {
+			target.Field(index).Set(value.Field(index))
+		}
+	} else {
+		target.Set(value)
+	}
 	return nil
 }
 
