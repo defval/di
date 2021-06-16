@@ -61,11 +61,6 @@ func (s *defaultSchema) find(t reflect.Type, tags Tags) (*node, error) {
 		return nil, fmt.Errorf("type %s%s %w", t, tags, ErrTypeNotExists)
 	}
 	if canInject(t) {
-		// constructor result with di.Inject - only addressable pointers
-		// anonymous parameters with di.Inject - only struct
-		//if t.Kind() == reflect.Ptr {
-		//	return nil, fmt.Errorf("inject %s%s %w, use %s%s", t, tags, errFieldsNotSupported, t.Elem(), tags)
-		//}
 		node := &node{
 			compiler: newTypeCompiler(t),
 			rt:       t,

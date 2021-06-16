@@ -71,7 +71,7 @@ func New(options ...Option) (_ *Container, err error) {
 	return c, nil
 }
 
-// Apply
+// Apply applies options to container.
 func (c *Container) Apply(options ...Option) error {
 	var di diopts
 	for _, opt := range options {
@@ -123,7 +123,7 @@ func (c *Container) Provide(constructor Constructor, options ...ProvideOption) e
 }
 
 // AddParent adds a parent container. Types are resolved from the container,
-// it's parents, and ancestors.  An error is a cycle is detected in ancestry tree.
+// it's parents, and ancestors. An error is a cycle is detected in ancestry tree.
 func (c *Container) AddParent(parent *Container) error {
 	return c.schema.addParent(parent.schema)
 }
@@ -195,6 +195,7 @@ func (c *Container) provideNode(n *node, params ProvideParams) error {
 	return nil
 }
 
+// Pointer is a pointer type variable. For example *http.Server.
 type Pointer interface{}
 
 // Resolve resolves type and fills target pointer.
@@ -219,18 +220,15 @@ func (c *Container) resolve(ptr Pointer, options ...ResolveOption) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", node, err)
 	}
-
 	rv := reflect.ValueOf(ptr)
 	target := rv.Elem()
-
 	if canInject(rv.Type()) {
-		for index, _ := range parsePopulateFields(target.Type()) {
+		for index := range parsePopulateFields(target.Type()) {
 			target.Field(index).Set(value.Field(index))
 		}
 	} else {
 		target.Set(value)
 	}
-
 	return nil
 }
 

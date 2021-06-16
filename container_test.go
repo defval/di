@@ -257,6 +257,7 @@ func TestContainer_Resolve(t *testing.T) {
 		err = c.Provide(func() (*http.Server, error) {
 			return &http.Server{}, fmt.Errorf("server build failed")
 		})
+		require.NoError(t, err)
 		err = c.Provide(func(server *http.Server) string {
 			return "string"
 		})
@@ -1312,9 +1313,8 @@ func TestContainer_Cleanup(t *testing.T) {
 	})
 }
 
-func TestParentContainer(t *testing.T) {
+func TestContainer_AddParent(t *testing.T) {
 	t.Run("provide ancestor and resolve in child", func(t *testing.T) {
-
 		papaw, err := di.New()
 		require.NoError(t, err)
 		require.NotNil(t, papaw)

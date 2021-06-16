@@ -56,7 +56,7 @@ func ProvideValue(value Value, options ...ProvideOption) Option {
 // Third result is a optional error. Sometimes our types cannot be constructed.
 type Constructor interface{}
 
-// Value
+// Value is a variable of provided or resolved type.
 type Value interface{}
 
 // ProvideOption is a functional option interface that modify provide behaviour. See di.As(), di.WithName().

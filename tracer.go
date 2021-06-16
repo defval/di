@@ -19,6 +19,7 @@ type Tracer interface {
 type StdTracer struct {
 }
 
+// Trace traces debug information with default logger.
 func (s StdTracer) Trace(format string, args ...interface{}) {
 	log.Printf(format, args...)
 }
