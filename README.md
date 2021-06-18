@@ -31,6 +31,7 @@ behavior without boilerplate.
 - Tagging
 - Grouping
 - Cleanup
+- Container Chaining / Scopes
 
 ## Documentation
 
