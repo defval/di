@@ -7,7 +7,7 @@ The format is based on
 project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html): TBD, use modules or another vendor system.
 
-## Not released yet
+## v1.10.0
 
 ### Added
 
