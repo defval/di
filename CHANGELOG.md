@@ -7,6 +7,12 @@ The format is based on
 project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html): TBD, use modules or another vendor system.
 
+## Unreleased
+
+### Added
+
+- `di.Decorate` function that applies function after type resolve.
+
 ## v1.10.0
 
 ### Added
