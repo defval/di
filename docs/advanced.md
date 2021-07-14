@@ -6,6 +6,7 @@
 - [Struct fields injection](#struct-fields-injection)
 - [Iteration](#iteration)
 - [Cleanup](#cleanup)
+- [Container Chaining / Scopes](#container-chaining--scopes)
 
 ### Modules
 
@@ -209,27 +210,32 @@ if err != nil {
 container.Cleanup() // file was closed
 ```
 
-### Container Chains
+### Container Chaining / Scopes
 
 You can chain containers together so that values can be resolved from a
-parent container. The child
+parent container. This lets you do things like have a configuration 
+scope container and an application scoped container.  By keeping 
+configuration values in a different container, you can re-create
+the application scoped container when you make configuration changes
+since each container has an independent lifecycle.
 
 **Note:** You should cleanup each container manually.
 
 ```go
-parent, err := container.New(
-    di.Provide(NewServer),
-    di.Provide(NewServeMux),
+configContainer, err := container.New(
+    di.Provide(NewServerConfig),
 )
 
-child, err := container.New()
+appContainer, err := container.New(di.Provide(config *SeverConfig) *http.Server {
+    sever := ...
+    return server
+})
 
-err = child.AddParent(parent)
-if err != nil {
-// handle error
+if err := appContainer.AddParent(configContainer); err != nil {
+   // handle error
 }
 
 var server *http.Server
-err := child.Resolve(&server)
+err := appContainer.Resolve(&server)
 ```
 
