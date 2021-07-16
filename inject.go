@@ -1,8 +1,10 @@
 package di
 
 import (
+	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 // Inject indicates that struct public fields will be injected automatically.
@@ -78,7 +80,7 @@ func parsePopulateFields(rt reflect.Type) map[int]field {
 		}
 		// cur - current field
 		cur := rt.Field(fi)
-		f, valid := inspectStructField(cur)
+		f, valid := inspectStructField(rt, cur)
 		if !valid {
 			continue
 		}
@@ -92,10 +94,65 @@ func parsePopulateFields(rt reflect.Type) map[int]field {
 }
 
 // inspectStructField parses struct field
-func inspectStructField(f reflect.StructField) (field, bool) {
+func inspectStructField(rt reflect.Type, f reflect.StructField) (field, bool) {
+
+	result := field{
+		rt:       f.Type,
+		tags:     Tags{},
+		optional: false,
+	}
+	if f.Tag == "" {
+		return result, true
+	}
+
+	diTag := f.Tag.Get("di")
+	if diTag != "" {
+		for _, v := range strings.Split(diTag, ",") {
+			v = strings.TrimSpace(v)
+			switch v {
+			case "skip":
+				return field{}, false
+			case "optional":
+				result.optional = true
+			default:
+				kv := strings.SplitN(v, "=", 2)
+				if len(kv) == 2 {
+					result.tags[kv[0]] = kv[1]
+				} else {
+					panic(fmt.Sprintf("invalid di tag: key=value got: %s", v))
+				}
+			}
+		}
+		return result, true
+	} else {
+		// handle the old deprecated struct tagging style.
+		result, noSkip := inspectStructFieldDeprecated(f)
+		tracer.Trace("Deprecation warning: please replace the field tags on '%s.%s' with: %v", rt.Name(), f.Name, newTagStyleText(result.tags, result.optional, !noSkip))
+		return result, noSkip
+	}
+}
+
+func newTagStyleText(tags map[string]string, optional bool, skip bool) string {
+	parts := []string{}
+	if skip {
+		parts = append(parts, "skip")
+	} else {
+
+		if optional {
+			parts = append(parts, "optional")
+		}
+		for k, v := range tags {
+			parts = append(parts, k+"="+v)
+		}
+	}
+	return `di:"` + strings.Join(parts, ",") + `"`
+}
+
+func inspectStructFieldDeprecated(f reflect.StructField) (field, bool) {
 	tags := Tags{}
 	t := string(f.Tag)
 	optional := false
+
 	// this code copied from reflect.StructField.Lookup() method.
 	for t != "" {
 		// Skip leading space.
@@ -140,7 +197,11 @@ func inspectStructField(f reflect.StructField) (field, bool) {
 			break
 		}
 		if name == "skip" && value == "true" {
-			return field{}, false
+			return field{
+				rt:       f.Type,
+				tags:     tags,
+				optional: optional,
+			}, false
 		}
 		if name == "optional" {
 			if value == "true" {

@@ -900,9 +900,21 @@ func TestContainer_Tags(t *testing.T) {
 		require.Len(t, muxs, 2)
 	})
 
-	t.Run("provide type with tags", func(t *testing.T) {
+	t.Run("provide type with tags (deprecated)", func(t *testing.T) {
 		type Server struct {
 			di.Tags `http:"true" server:"true"`
+		}
+		var s *Server
+		_, err := di.New(
+			di.Provide(func() *Server { return &Server{} }),
+			di.Resolve(&s, di.Tags{"http": "true", "server": "true"}),
+		)
+		require.NoError(t, err)
+	})
+
+	t.Run("provide type with tags", func(t *testing.T) {
+		type Server struct {
+			di.Tags `di:"http=true,server=true"`
 		}
 		var s *Server
 		_, err := di.New(
@@ -1185,12 +1197,25 @@ func TestContainer_Inject(t *testing.T) {
 		require.Contains(t, err.Error(), ": *di_test.InjectableType: type *http.ServeMux not exists in the container")
 	})
 
-	t.Run("not existing and optional field set to nil", func(t *testing.T) {
+	t.Run("not existing and optional field set to nil (deprecated)", func(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)
 		type InjectableType struct {
 			di.Inject
 			Mux *http.ServeMux `optional:"true"`
+		}
+		require.NoError(t, c.Provide(func() *InjectableType { return &InjectableType{} }))
+		var result *InjectableType
+		require.NoError(t, c.Resolve(&result))
+		require.Nil(t, result.Mux)
+	})
+
+	t.Run("not existing and optional field set to nil", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		type InjectableType struct {
+			di.Inject
+			Mux *http.ServeMux `di:"optional"`
 		}
 		require.NoError(t, c.Provide(func() *InjectableType { return &InjectableType{} }))
 		var result *InjectableType
@@ -1238,7 +1263,7 @@ func TestContainer_Inject(t *testing.T) {
 		require.Contains(t, err.Error(), ": cycle detected")
 	})
 
-	t.Run("optional parameter may be nil", func(t *testing.T) {
+	t.Run("optional parameter may be nil (deprecated)", func(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)
 		type Parameter struct {
@@ -1254,7 +1279,23 @@ func TestContainer_Inject(t *testing.T) {
 		require.Nil(t, extracted.server)
 	})
 
-	t.Run("resolve group in params", func(t *testing.T) {
+	t.Run("optional parameter may be nil", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		type Parameter struct {
+			di.Inject
+			Server *http.Server `di:"optional"`
+		}
+		type Result struct {
+			server *http.Server
+		}
+		require.NoError(t, c.Provide(func(params Parameter) *Result { return &Result{server: params.Server} }))
+		var extracted *Result
+		require.NoError(t, c.Resolve(&extracted))
+		require.Nil(t, extracted.server)
+	})
+
+	t.Run("resolve group in params (deprecated)", func(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)
 
@@ -1273,7 +1314,26 @@ func TestContainer_Inject(t *testing.T) {
 		require.True(t, extracted)
 	})
 
-	t.Run("optional group may be nil", func(t *testing.T) {
+	t.Run("resolve group in params", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+
+		type Fn func()
+		type Params struct {
+			di.Inject
+			Handlers []Fn `di:"optional"`
+		}
+		require.NoError(t, c.Provide(func() Fn { return func() {} }))
+		require.NoError(t, c.Provide(func() Fn { return func() {} }))
+		require.NoError(t, c.Provide(func(params Params) bool {
+			return len(params.Handlers) == 2
+		}))
+		var extracted bool
+		require.NoError(t, c.Resolve(&extracted))
+		require.True(t, extracted)
+	})
+
+	t.Run("optional group may be nil (deprecated)", func(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)
 		type Params struct {
@@ -1288,7 +1348,22 @@ func TestContainer_Inject(t *testing.T) {
 		require.True(t, extracted)
 	})
 
-	t.Run("skip private and skip tagged fields", func(t *testing.T) {
+	t.Run("optional group may be nil", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		type Params struct {
+			di.Inject
+			Handlers []http.Handler `di:"optional"`
+		}
+		require.NoError(t, c.Provide(func(params Params) bool {
+			return params.Handlers == nil
+		}))
+		var extracted bool
+		require.NoError(t, c.Resolve(&extracted))
+		require.True(t, extracted)
+	})
+
+	t.Run("skip private and skip tagged fields (deprecated)", func(t *testing.T) {
 		c, err := di.New()
 		require.NoError(t, err)
 		type InjectableParameter struct {
@@ -1296,6 +1371,36 @@ func TestContainer_Inject(t *testing.T) {
 			private []http.Handler
 			Addrs   []net.Addr     `optional:"true"`
 			Skipped *http.ServeMux `skip:"true"`
+		}
+		type InjectableType struct {
+			di.Inject
+			private []http.Handler
+			Addrs   []net.Addr `optional:"true"`
+		}
+		require.NoError(t, c.Provide(func(param InjectableParameter) bool {
+			return param.Addrs == nil
+		}))
+		require.NoError(t, c.Provide(func() *InjectableType { return &InjectableType{} }))
+		var extracted bool
+		require.NoError(t, c.Resolve(&extracted))
+		require.True(t, extracted)
+		var result *InjectableType
+		require.NoError(t, c.Resolve(&result))
+
+		mux := http.NewServeMux()
+		p := InjectableParameter{Skipped: mux}
+		require.NoError(t, c.Resolve(&p))
+		require.Equal(t, InjectableParameter{Skipped: mux}, p)
+	})
+
+	t.Run("skip private and skip tagged fields", func(t *testing.T) {
+		c, err := di.New()
+		require.NoError(t, err)
+		type InjectableParameter struct {
+			di.Inject
+			private []http.Handler
+			Addrs   []net.Addr     `di:"optional"`
+			Skipped *http.ServeMux `di:"skip"`
 		}
 		type InjectableType struct {
 			di.Inject
