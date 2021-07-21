@@ -13,6 +13,9 @@ modules or another vendor system.
 ### Added
 
 - `di.Decorate` function that applies function after type resolve.
+
+### Changed
+
 - [@chirino](https://github.com/chirino): Prefer using "di:" field tags
   to control injection options to avoid conflicting with tags used by
   other libraries ([#38](https://github.com/goava/di/pull/38)).
