@@ -27,7 +27,7 @@ func newConstructorNode(ctor interface{}) (*node, error) {
 		if !ok {
 			return nil, fmt.Errorf("tags usage error: need to embed di.Tags without field name")
 		}
-		field, ok := inspectStructField(f)
+		field, ok := inspectStructField(tmp, f)
 		if ok {
 			tags = field.tags
 		}

@@ -80,8 +80,8 @@ type Parameters struct {
 	di.Inject
 	
 	// use tag for the container to know that field need to be injected.
-	Leader *Database `type:"leader"`
-	Follower *Database  `type:"follower"`
+	Leader *Database `di:"type=leader"`
+	Follower *Database  `di:"type=follower"`
 }
 
 // NewService creates new service with provided parameters.
@@ -103,7 +103,7 @@ di.Resolve(&db, di.Tags{"type": "*"})
 
 ### Optional parameters
 
-Also, `di.Inject` with tag `optional` provide ability to skip dependency
+Also, `di.Inject` with tag `di:"optional"` provide ability to skip dependency
 if it not exists in the container.
 
 ```go
@@ -111,7 +111,7 @@ if it not exists in the container.
 type ServiceParameter struct {
 	di.Inject
 	
-	Logger *Logger `optional:"true"`
+	Logger *Logger `di:"optional"`
 }
 ```
 
@@ -125,21 +125,21 @@ You can use tagged and optional together.
 type ServiceParameter struct {
 	di.Inject
 	
-	StdOutLogger *Logger `type:"stdout"`
-	FileLogger   *Logger `type:"file" optional:"true"`
+	StdOutLogger *Logger `di:"type=stdout"`
+	FileLogger   *Logger `di:"type=file,optional"`
 }
 ```
 
-If you need to skip fields injection use `skip:"true"` tags for this:
+If you need to skip fields injection use `di:"skip"` tags for this:
 
 ```go
 // ServiceParameter
 type ServiceParameter struct {
 	di.Inject
 	
-	StdOutLogger *Logger    `type:"stdout"`
-	FileLogger   *Logger    `type:"file" optional:"true"`
-	SkipField    *SomeType  `skip:"true"` // injection skipped
+	StdOutLogger *Logger    `di:"type=stdout"`
+	FileLogger   *Logger    `di:"type=file,optional"`
+	SkipField    *SomeType  `di:"skip"` // injection skipped
 }
 ```
 
@@ -158,7 +158,7 @@ type Controller struct {
     // fields must be public
     // tag lets to specify fields need to be injected
     Users   UserService
-    Friends FriendsService  `type:"cached"`
+    Friends FriendsService  `di:"type=cached"`
 }
 
 // NewController creates controller.
