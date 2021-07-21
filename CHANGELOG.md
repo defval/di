@@ -5,24 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this
 project adheres to
-[Semantic Versioning](https://semver.org/spec/v2.0.0.html): TBD, use modules or another vendor system.
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html): TBD, use
+modules or another vendor system.
 
-## Unreleased
+## v1.11.0
 
 ### Added
 
 - `di.Decorate` function that applies function after type resolve.
+- [@chirino](https://github.com/chirino): Prefer using "di:" field tags
+  to control injection options to avoid conflicting with tags used by
+  other libraries ([#38](https://github.com/goava/di/pull/38)).
 
 ## v1.10.0
 
 ### Added
 
-- [@chirino](https://github.com/chirino): Container nesting. See `AddParent()` function ([#35](https://github.com/goava/di/pull/35)).
+- [@chirino](https://github.com/chirino): Container nesting. See
+  `AddParent()` function ([#35](https://github.com/goava/di/pull/35)).
 - An experimental feature: Instance decoration with `di.Decorate()`.
 
 ### Fixed
 
-- [@chirino](https://github.com/chirino): Calling `Resolve()` on a `di.Injectable` would overwrite the skip fields ([#34](https://github.com/goava/di/pull/34)).
+- [@chirino](https://github.com/chirino): Calling `Resolve()` on a
+  `di.Injectable` would overwrite the skip fields
+  ([#34](https://github.com/goava/di/pull/34)).
 
 ## v1.9.0
 
@@ -118,7 +125,8 @@ project adheres to
 ### BREAKING CHANGES
 
 - Provide duplications allowed.
-- Removed tag `di`. Now all public fields in injectable type will be injected.
+- Removed tag `di`. Now all public fields in injectable type will be
+  injected.
 - Resolving node without tags, now returns all nodes of this type.
 - Now, `di:"type_name"` is a `name:"type_name"`.
 - Removed `di.Prototype()`: bad practice.
