@@ -923,6 +923,22 @@ func TestContainer_Tags(t *testing.T) {
 		)
 		require.NoError(t, err)
 	})
+
+	t.Run("provide type with non di tags", func(t *testing.T) {
+		type Dep struct {
+		}
+		type Server struct {
+			di.Inject
+			Dep *Dep `json:"dep" di:""`
+		}
+		var s Server
+		_, err := di.New(
+			di.Provide(func() *Dep { return &Dep{} }),
+			di.Resolve(&s),
+		)
+		require.NoError(t, err)
+	})
+
 }
 
 func TestContainer_Group(t *testing.T) {
