@@ -105,8 +105,11 @@ func inspectStructField(rt reflect.Type, f reflect.StructField) (field, bool) {
 		return result, true
 	}
 
-	diTag := f.Tag.Get("di")
-	if diTag != "" {
+	diTag, found := f.Tag.Lookup("di")
+	if found {
+		if diTag == "" {
+			return result, true
+		}
 		for _, v := range strings.Split(diTag, ",") {
 			v = strings.TrimSpace(v)
 			switch v {
