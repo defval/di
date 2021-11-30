@@ -8,6 +8,13 @@ project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html): TBD, use
 modules or another vendor system.
 
+## v1.11.1
+
+### Fixed
+
+- [@chirino](https://github.com/chirino): fix: you could not use a
+struct to for both di and json marshalling ([#41](https://github.com/goava/di/pull/41)).
+
 ## v1.11.0
 
 ### Added
