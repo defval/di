@@ -60,7 +60,7 @@ In preferred functional option style:
 
 ```go
 // create container
-container, err := container.New(
+container, err := di.New(
 	di.Provide(NewServer),
 	di.Provide(NewServeMux),
 )
