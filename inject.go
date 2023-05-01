@@ -17,12 +17,12 @@ import (
 //
 // You can specify tags for injected types:
 //
-//  type Application struct {
-//  	di.Inject
+//	 type Application struct {
+//	 	di.Inject
 //
 //		Public 	*http.Server `type:"public"` 	// *http.Server with type:public tag combination will be injected
 //		Private *http.Server `type:"private"` 	// *http.Server with type:private tag combination will be injected
-//  }
+//	 }
 type Inject struct {
 	injectable
 }

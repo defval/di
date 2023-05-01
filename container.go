@@ -18,28 +18,28 @@ type Container struct {
 //
 // Define constructors and invocations:
 //
-// 	func NewHTTPServer(mux *http.ServeMux) *http.Server {
-// 		return &http.Server{
-// 			Handler: mux,
-// 		}
-// 	}
+//	func NewHTTPServer(mux *http.ServeMux) *http.Server {
+//		return &http.Server{
+//			Handler: mux,
+//		}
+//	}
 //
-// 	func NewHTTPServeMux() *http.ServeMux {
-// 		return http.ServeMux{}
-// 	}
+//	func NewHTTPServeMux() *http.ServeMux {
+//		return http.ServeMux{}
+//	}
 //
-// 	func StartServer(server *http.Server) error {
+//	func StartServer(server *http.Server) error {
 //		return server.ListenAndServe()
 //	}
 //
 // Use it with container:
 //
-// 	container, err := di.New(
-// 		di.Provide(NewHTTPServer),
-// 		di.Provide(NewHTTPServeMux),
+//	container, err := di.New(
+//		di.Provide(NewHTTPServer),
+//		di.Provide(NewHTTPServeMux),
 //		di.Invoke(StartServer),
-// 	)
-// 	if err != nil {
+//	)
+//	if err != nil {
 //		// handle error
 //	}
 func New(options ...Option) (_ *Container, err error) {
@@ -62,7 +62,7 @@ func New(options ...Option) (_ *Container, err error) {
 
 // Apply applies options to container.
 //
-// 	err := container.Apply(
+//	err := container.Apply(
 //		di.Provide(NewHTTPServer),
 //	)
 //	if err != nil {
@@ -96,9 +96,9 @@ func (c *Container) ProvideValue(value Value, options ...ProvideOption) error {
 
 // Invocation is a function whose signature looks like:
 //
-//		func StartServer(server *http.Server) error {
-//			return server.ListenAndServe()
-//		}
+//	func StartServer(server *http.Server) error {
+//		return server.ListenAndServe()
+//	}
 //
 // Like a constructor invocation may have unlimited count of arguments and
 // they will be resolved automatically. The invocation can return an optional error.
@@ -122,7 +122,7 @@ type Pointer interface{}
 
 // Has checks that type exists in container, if not it return false.
 //
-// 	var server *http.Server
+//	var server *http.Server
 //	if container.Has(&server) {
 //		// handle server existence
 //	}
@@ -158,16 +158,16 @@ type IterateFunc func(tags Tags, value ValueFunc) error
 
 // Iterate iterates over group of Pointer type with IterateFunc.
 //
-//  var servers []*http.Server
-//  iterFn := func(tags di.Tags, loader ValueFunc) error {
-//		i, err := loader()
-//		if err != nil {
-//			return err
-//		}
-//		// do stuff with result: i.(*http.Server)
-//		return nil
-//  }
-//  container.Iterate(&servers, iterFn)
+//	 var servers []*http.Server
+//	 iterFn := func(tags di.Tags, loader ValueFunc) error {
+//			i, err := loader()
+//			if err != nil {
+//				return err
+//			}
+//			// do stuff with result: i.(*http.Server)
+//			return nil
+//	 }
+//	 container.Iterate(&servers, iterFn)
 func (c *Container) Iterate(target Pointer, fn IterateFunc, options ...ResolveOption) error {
 	node, err := c.find(target, options...)
 	if err != nil {

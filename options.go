@@ -4,9 +4,10 @@ package di
 // options, see https://dave.cheney.net/2014/10/17/functional-options-for-friendly-apis.
 // Below presented all possible options with their description:
 //
-// 	- di.Provide - provide constructors
-//	- di.Invoke - add invocations
-//	- di.Resolve - resolves type
+//   - di.Provide - provide constructors
+//   - di.ProvideValue - provide value
+//   - di.Invoke - add invocations
+//   - di.Resolve - resolves type
 type Option interface {
 	apply(c *diopts)
 }
@@ -39,15 +40,15 @@ func ProvideValue(value Value, options ...ProvideOption) Option {
 
 // Constructor is a function with follow signature:
 //
-// 	func NewHTTPServer(addr string, handler http.Handler) (server *http.Server, cleanup func(), err error) {
-// 		server := &http.Server{
-// 			Addr: addr,
-// 		}
-// 		cleanup = func() {
-// 			server.Close()
-// 		}
-// 		return server, cleanup, nil
-// 	}
+//	func NewHTTPServer(addr string, handler http.Handler) (server *http.Server, cleanup func(), err error) {
+//		server := &http.Server{
+//			Addr: addr,
+//		}
+//		cleanup = func() {
+//			server.Close()
+//		}
+//		return server, cleanup, nil
+//	}
 //
 // This constructor function teaches container how to build server. Arguments (addr and handler) in this function
 // is a dependencies. They will be resolved automatically when someone needs a server. Constructor may have unlimited
@@ -73,29 +74,29 @@ type ProvideOption interface {
 //
 // Create type constructors:
 //
-// 		func NewServeMux() *http.ServeMux {
-// 			return &http.ServeMux{}
-// 		}
+//	func NewServeMux() *http.ServeMux {
+//		return &http.ServeMux{}
+//	}
 //
-//		func NewServer(handler *http.Handler) *http.Server {
-//			return &http.Server{
-//				Handler: handler,
-//			}
+//	func NewServer(handler *http.Handler) *http.Server {
+//		return &http.Server{
+//			Handler: handler,
 //		}
+//	}
 //
 // Build container with di.As provide option:
 //
-//		container, err := di.New(
-//			di.Provide(NewServer),
-//			di.Provide(NewServeMux, di.As(new(http.Handler)),
-//		)
-//		if err != nil {
-//			// handle error
-//		}
-//		var server *http.Server
-//		if err := container.Resolve(&http.Server); err != nil {
-//			// handle error
-//		}
+//	container, err := di.New(
+//		di.Provide(NewServer),
+//		di.Provide(NewServeMux, di.As(new(http.Handler)),
+//	)
+//	if err != nil {
+//		// handle error
+//	}
+//	var server *http.Server
+//	if err := container.Resolve(&http.Server); err != nil {
+//		// handle error
+//	}
 //
 // In this example you can see how container inject type *http.ServeMux as http.Handler
 // interface into the server constructor.
@@ -105,10 +106,10 @@ type ProvideOption interface {
 // Container automatically creates group for interfaces. For example, you can use type []http.Handler in
 // previous example.
 //
-//		var handlers []http.Handler
-//		if err := container.Resolve(&handlers); err != nil {
-//			// handle error
-//		}
+//	var handlers []http.Handler
+//	if err := container.Resolve(&handlers); err != nil {
+//		// handle error
+//	}
 //
 // Container checks that provided type implements interface if not cause compile error.
 func As(interfaces ...Interface) ProvideOption {
@@ -133,11 +134,9 @@ func WithName(name string) ProvideOption {
 }
 
 // Decorator can modify container instance.
-// EXPERIMENTAL FEATURE: functional can be changed.
 type Decorator func(value Value) error
 
 // Decorate will be called after type construction. You can modify your pointer types.
-// EXPERIMENTAL FEATURE: functional can changed.
 func Decorate(decorators ...Decorator) ProvideOption {
 	return provideOption(func(params *ProvideParams) {
 		params.Decorators = append(params.Decorators, decorators...)
@@ -173,21 +172,21 @@ func Invoke(fn Invocation, options ...InvokeOption) Option {
 
 // Options group together container options.
 //
-//   account := di.Options(
-//     di.Provide(NewAccountController),
-//     di.Provide(NewAccountRepository),
-//   )
-//   auth := di.Options(
-//     di.Provide(NewAuthController),
-//     di.Provide(NewAuthRepository),
-//   )
-//   container, err := di.New(
-//     account,
-//     auth,
-//   )
-//   if err != nil {
-//     // handle error
-//   }
+//	account := di.Options(
+//	  di.Provide(NewAccountController),
+//	  di.Provide(NewAccountRepository),
+//	)
+//	auth := di.Options(
+//	  di.Provide(NewAuthController),
+//	  di.Provide(NewAuthRepository),
+//	)
+//	container, err := di.New(
+//	  account,
+//	  auth,
+//	)
+//	if err != nil {
+//	  // handle error
+//	}
 func Options(options ...Option) Option {
 	return option(func(container *diopts) {
 		for _, opt := range options {

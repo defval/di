@@ -26,6 +26,8 @@ into high-level behavior without boilerplate.
 - Lazy-loading
 - Tagging
 - Grouping
+- Iteration
+- Decoration
 - Cleanup
 - Container Chaining / Scopes
 
