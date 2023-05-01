@@ -1,5 +1,6 @@
 ## Injector makefile
 
-.PHONY: test ## Run tests
-test:
-	@.build/test.sh
+.PHONY: cover
+cover:
+	go test -race -coverprofile=cover.out -coverpkg=./... ./...
+	go tool cover -html=cover.out -o cover.html
