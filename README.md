@@ -26,6 +26,12 @@ into high-level behavior without boilerplate.
 - Decoration
 - Cleanup
 - Container Chaining / Scopes
+- 
+## Installation
+
+```shell
+go get github.com/goava/di
+```
 
 ## Documentation
 
@@ -33,17 +39,11 @@ You can use the standard [pkg.go.dev](https://pkg.go.dev/github.com/goava/di) an
 to auto-wiring libraries such as [google/wire](https://github.com/google/wire)
 or [uber-go/dig](https://github.com/uber-go/dig), start with the [tutorial](./docs/tutorial.md).
 
-## Essential Reading
+### Essential Reading
 
 - [Tutorial](./docs/tutorial.md)
 - [Examples](./_examples)
 - [Advanced Features](./docs/advanced.md)
-
-## Installation
-
-```shell
-go get github.com/goava/di
-```
 
 ## Example Usage
 
