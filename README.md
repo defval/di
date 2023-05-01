@@ -26,7 +26,7 @@ into high-level behavior without boilerplate.
 - Decoration
 - Cleanup
 - Container Chaining / Scopes
-- 
+
 ## Installation
 
 ```shell
