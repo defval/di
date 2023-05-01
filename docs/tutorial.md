@@ -21,8 +21,8 @@ prints output using the standard `log` package:
 
 ```go
 func main() {
-di.SetTracer(&di.StdTracer{})
-//...
+    di.SetTracer(&di.StdTracer{})
+    //...
 }
 ```
 
@@ -35,14 +35,14 @@ functional constructors that build them:
 ```go
 // NewServer builds an HTTP server with the provided mux as handler.
 func NewServer(mux *http.ServeMux) *http.Server {
-return &http.Server{
-Handler: mux,
-}
+    return &http.Server{
+        Handler: mux,
+    }
 }
 
 // NewServeMux creates a new HTTP serve mux.
 func NewServeMux() *http.ServeMux {
-return &http.ServeMux{}
+    return &http.ServeMux{}
 }
 ```
 
