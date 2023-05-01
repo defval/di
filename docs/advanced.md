@@ -1,17 +1,17 @@
-# Advanced features
+# Advanced Features
 
 - [Modules](#modules)
 - [Tags](#tags)
-- [Optional parameters](#optional-parameters)
-- [Struct fields injection](#struct-fields-injection)
+- [Optional Parameters](#optional-parameters)
+- [Struct Field Injection](#struct-field-injection)
 - [Iteration](#iteration)
+- [Decoration](#decoration)
 - [Cleanup](#cleanup)
 - [Container Chaining / Scopes](#container-chaining--scopes)
 
 ### Modules
 
-You can group previous options into single variable by using
-`di.Options()`:
+You can group previous options into a single variable using `di.Options()`:
 
 ```go
 // account module
@@ -36,8 +36,8 @@ if err != nil {
 
 ### Tags
 
-If you have more than one instances of same type, you can specify alias.
-For example two instances of database: leader - for writing, follower -
+If you have more than one instance of the same type, you can specify an alias.
+For example, two instances of a database: leader - for writing, follower -
 for reading.
 
 #### Wrap type into another unique type
@@ -63,7 +63,7 @@ di.Provide(NewLeader, di.Tags{"type":"leader"})
 di.Provide(NewFollower, di.Tags{"type", "follower"}))
 ```
 
-If you need to resolve it from the container use `di.Tags` *resolve
+If you need to resolve it from the container, use `di.Tags` *resolve
 option*.
 
 ```go
@@ -71,7 +71,7 @@ var db *Database
 container.Resolve(&db, di.Tags{"type": "leader"}))
 ```
 
-If you need to provide named definition in another constructor embed
+If you need to provide a named definition in another constructor, embed
 `di.Inject`.
 
 ```go
@@ -84,7 +84,7 @@ type Parameters struct {
 	Follower *Database  `di:"type=follower"`
 }
 
-// NewService creates new service with provided parameters.
+// NewService creates a new service with provided parameters.
 func NewService(parameters Parameters) *Service {
 	return &Service{
 		Leader:  parameters.Leader,
@@ -93,7 +93,7 @@ func NewService(parameters Parameters) *Service {
 }
 ```
 
-If you need to resolve all types with same tag key, use `*` as tag
+If you need to resolve all types with the same tag key, use `*` as the tag
 value:
 
 ```go
@@ -101,10 +101,10 @@ var db []*Database
 di.Resolve(&db, di.Tags{"type": "*"})
 ```
 
-### Optional parameters
+### Optional Parameters
 
-Also, `di.Inject` with tag `di:"optional"` provide ability to skip dependency
-if it not exists in the container.
+Also, `di.Inject` with tag `di:"optional"` provides the ability to skip a dependency
+if it does not exist in the container.
 
 ```go
 // ServiceParameter
@@ -130,7 +130,7 @@ type ServiceParameter struct {
 }
 ```
 
-If you need to skip fields injection use `di:"skip"` tags for this:
+If you need to skip field injection, use `di:"skip"` tags for this:
 
 ```go
 // ServiceParameter
@@ -143,11 +143,11 @@ type ServiceParameter struct {
 }
 ```
 
-### Struct fields injection
+### Struct Field Injection
 
 To avoid constant constructor changes, you can use `di.Inject`. Only
-struct pointers are supported as constructing result. And only
-`di`-taged fields will be injected. Such a constructor will work with
+struct pointers are supported as constructing results. And only
+`di`-tagged fields will be injected. Such a constructor will work with
 using `di` only.
 
 ```go
@@ -161,19 +161,80 @@ type Controller struct {
     Friends FriendsService  `di:"type=cached"`
 }
 
-// NewController creates controller.
+// NewController creates a controller.
 func NewController() *Controller {
     return &Controller{}
 }
 ```
-
 ### Iteration
 
-TBD
+The `di` package provides iteration capabilities, allowing you to iterate over a group of a specific Pointer type with the `IterateFunc`. This can be useful when working with multiple instances of a type or when you need to perform actions on each instance.
+
+```go
+// ValueFunc is a lazy-loading wrapper for iteration.
+type ValueFunc func() (interface{}, error)
+
+// IterateFunc is a function that will be called on each instance in the iterate selection.
+type IterateFunc func(tags Tags, value ValueFunc) error
+```
+
+To use iteration with the container, follow the example below:
+
+```go
+var servers []*http.Server
+iterFn := func(tags di.Tags, loader ValueFunc) error {
+	i, err := loader()
+	if err != nil {
+		return err
+	}
+	// do stuff with result: i.(*http.Server)
+	return nil
+}
+
+container.Iterate(&servers, iterFn)
+```
+
+In this example, the `Iterate` method is called on the container, passing a slice of pointers to the desired type (in this case, `*http.Server`) and the iterate function, which will be executed on each instance.
 
 ### Decoration
 
-TBD
+The `di` package supports decoration, allowing you to modify container instances through the use of decorators. This can be helpful when you need to make additional modifications to instances after they have been constructed.
+
+```go
+// Decorator can modify container instance.
+type Decorator func(value Value) error
+
+// Decorate will be called after type construction. You can modify your pointer types.
+func Decorate(decorators ...Decorator) ProvideOption {
+	return provideOption(func(params *ProvideParams) {
+		params.Decorators = append(params.Decorators, decorators...)
+	})
+}
+```
+
+To use decorators, you can add them to the `Provide` method using the `Decorate` function. Here's an example of a decorator that logs the creation of each instance:
+
+```go
+// Logger is a simple logger interface for demonstration purposes
+type Logger interface {
+	Log(message string)
+}
+
+// logInstanceCreation is a decorator that logs the creation of instances
+func logInstanceCreation(logger Logger) Decorator {
+	return func(value Value) error {
+		logger.Log(fmt.Sprintf("Instance of type logger created"))
+		return nil
+	}
+}
+
+// Usage example
+container, err := di.New(
+	di.Provide(NewMyType, di.Decorate(logInstanceCreation(myLogger))),
+)
+```
+
+In this example, the `logInstanceCreation` decorator logs a message every time a new instance is created. The decorator is added to the `Provide` method using the `Decorate` function, and it is executed after the type construction.
 
 ### Cleanup
 
@@ -213,8 +274,8 @@ container.Cleanup() // file was closed
 ### Container Chaining / Scopes
 
 You can chain containers together so that values can be resolved from a
-parent container. This lets you do things like have a configuration 
-scope container and an application scoped container.  By keeping 
+parent container. This lets you do things like have a configuration
+scope container and an application scoped container. By keeping
 configuration values in a different container, you can re-create
 the application scoped container when you make configuration changes
 since each container has an independent lifecycle.
@@ -238,4 +299,3 @@ if err := appContainer.AddParent(configContainer); err != nil {
 var server *http.Server
 err := appContainer.Resolve(&server)
 ```
-

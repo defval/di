@@ -10,15 +10,14 @@ var iTaggable = reflect.TypeOf(new(taggable)).Elem()
 
 // Tags is a string representation of key value pairs.
 //
-// 	type Server struct {
+//	type Server struct {
 //		di.Tags `http:"true" server:"true"`
 //	}
 //	_, err := di.New(
 //		di.Provide(func() *Server { return &Server{} }),
 //	)
-//  var s *Server
-//  c.Resolve(&s, di.Tags{"http": "true", "server": "true"})
-//	require.NoError(t, err)
+//	var s *Server
+//	c.Resolve(&s, di.Tags{"http": "true", "server": "true"})
 type Tags map[string]string
 
 // injectable interface needs to struct fields injection functional.
