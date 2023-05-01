@@ -8,10 +8,6 @@
 
 **DI** is a dependency injection library for the Go programming language.
 
-- [Tutorial](./docs/tutorial.md)
-- [Examples](./_examples)
-- [Advanced Features](./docs/advanced.md)
-
 Dependency injection is a form of inversion of control that increases modularity and extensibility in your programs.
 This library helps you organize responsibilities in your codebase and makes it easy to combine low-level implementations
 into high-level behavior without boilerplate.
@@ -36,6 +32,12 @@ into high-level behavior without boilerplate.
 You can use the standard [pkg.go.dev](https://pkg.go.dev/github.com/goava/di) and inline code comments. If you are new
 to auto-wiring libraries such as [google/wire](https://github.com/google/wire)
 or [uber-go/dig](https://github.com/uber-go/dig), start with the [tutorial](./docs/tutorial.md).
+
+## Essential Reading
+
+- [Tutorial](./docs/tutorial.md)
+- [Examples](./_examples)
+- [Advanced Features](./docs/advanced.md)
 
 ## Installation
 
