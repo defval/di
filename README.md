@@ -1,5 +1,4 @@
-DI
-===
+# DI
 
 [![Documentation](https://img.shields.io/badge/godoc-reference-blue.svg?style=for-the-badge&logo=go)](https://pkg.go.dev/github.com/goava/di)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/goava/di?logo=semver&style=for-the-badge)](https://github.com/goava/di/releases/latest)
@@ -7,18 +6,15 @@ DI
 [![Go Report Card](https://img.shields.io/badge/go%20report-A%2B-green?style=for-the-badge)](https://goreportcard.com/report/github.com/goava/di)
 [![Codecov](https://img.shields.io/codecov/c/github/goava/di?logo=codecov&style=for-the-badge)](https://codecov.io/gh/goava/di)
 
-Dependency injection for Go programming language.
+**DI** is a dependency injection library for the Go programming language.
 
-[Tutorial](./docs/tutorial.md) | [Examples](./_examples) |
-[Advanced features](./docs/advanced.md)
+- [Tutorial](./docs/tutorial.md)
+- [Examples](./_examples)
+- [Advanced Features](./docs/advanced.md)
 
-Dependency injection is one form of the broader technique of inversion
-of control. It is used to increase modularity of the program and make it
-extensible.
-
-This library helps you to organize responsibilities in your codebase and
-make it easy to combine low-level implementation into high-level
-behavior without boilerplate.
+Dependency injection is a form of inversion of control that increases modularity and extensibility in your programs.
+This library helps you organize responsibilities in your codebase and makes it easy to combine low-level implementations
+into high-level behavior without boilerplate.
 
 ## Features
 
@@ -35,20 +31,17 @@ behavior without boilerplate.
 
 ## Documentation
 
-You can use standard
-[pkg.go.dev](https://pkg.go.dev/github.com/goava/di) and inline code
-comments. If you do not have experience with auto-wiring libraries as
-[google/wire](https://github.com/google/wire),
-[uber-go/dig](https://github.com/uber-go/dig) or another - start with
-[tutorial](./docs/tutorial.md).
+You can use the standard [pkg.go.dev](https://pkg.go.dev/github.com/goava/di) and inline code comments. If you are new
+to auto-wiring libraries such as [google/wire](https://github.com/google/wire)
+or [uber-go/dig](https://github.com/uber-go/dig), start with the [tutorial](./docs/tutorial.md).
 
-## Install
+## Installation
 
 ```shell
 go get github.com/goava/di
 ```
 
-## What it looks like
+## Example Usage
 
 ```go
 package main
