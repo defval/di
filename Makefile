@@ -1,5 +1,3 @@
-## Injector makefile
-
 .PHONY: cover
 cover:
 	go test -race -coverprofile=cover.out -coverpkg=./... ./...
