@@ -230,7 +230,7 @@ func logInstanceCreation(logger Logger) Decorator {
 
 // Usage example
 container, err := di.New(
-	di.Provide(NewMyType, Decorate(logInstanceCreation(myLogger))),
+	di.Provide(NewMyType, di.Decorate(logInstanceCreation(myLogger))),
 )
 ```
 
