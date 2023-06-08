@@ -1,10 +1,10 @@
 # DI
 
-[![Documentation](https://img.shields.io/badge/godoc-reference-blue.svg?style=for-the-badge&logo=go)](https://pkg.go.dev/github.com/goava/di)
-[![GitHub release (latest by date)](https://img.shields.io/github/v/release/goava/di?logo=semver&style=for-the-badge)](https://github.com/goava/di/releases/latest)
-[![GitHub Workflow Status (with branch)](https://img.shields.io/github/actions/workflow/status/goava/di/go.yml?branch=master&logo=github-actions&style=for-the-badge)](https://github.com/goava/di/actions/workflows/go.yml)
-[![Go Report Card](https://img.shields.io/badge/go%20report-A%2B-green?style=for-the-badge)](https://goreportcard.com/report/github.com/goava/di)
-[![Codecov](https://img.shields.io/codecov/c/github/goava/di?logo=codecov&style=for-the-badge)](https://codecov.io/gh/goava/di)
+[![Documentation](https://img.shields.io/badge/godoc-reference-blue.svg?style=for-the-badge&logo=go)](https://pkg.go.dev/github.com/defval/di)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/defval/di?logo=semver&style=for-the-badge)](https://github.com/defval/di/releases/latest)
+[![GitHub Workflow Status (with branch)](https://img.shields.io/github/actions/workflow/status/defval/di/go.yml?branch=master&logo=github-actions&style=for-the-badge)](https://github.com/defval/di/actions/workflows/go.yml)
+[![Go Report Card](https://img.shields.io/badge/go%20report-A%2B-green?style=for-the-badge)](https://goreportcard.com/report/github.com/defval/di)
+[![Codecov](https://img.shields.io/codecov/c/github/defval/di?logo=codecov&style=for-the-badge)](https://codecov.io/gh/defval/di)
 
 **DI** is a dependency injection library for the Go programming language.
 
@@ -30,12 +30,12 @@ into high-level behavior without boilerplate.
 ## Installation
 
 ```shell
-go get github.com/goava/di
+go get github.com/defval/di
 ```
 
 ## Documentation
 
-You can use the standard [pkg.go.dev](https://pkg.go.dev/github.com/goava/di) and inline code comments. If you are new
+You can use the standard [pkg.go.dev](https://pkg.go.dev/github.com/defval/di) and inline code comments. If you are new
 to auto-wiring libraries such as [google/wire](https://github.com/google/wire)
 or [uber-go/dig](https://github.com/uber-go/dig), start with the [tutorial](./docs/tutorial.md).
 
@@ -59,7 +59,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/goava/di"
+	"github.com/defval/di"
 )
 
 func main() {
