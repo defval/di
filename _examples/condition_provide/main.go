@@ -7,7 +7,7 @@ import (
 	"net"
 	"os"
 
-	"github.com/goava/di"
+	"github.com/defval/di"
 )
 
 // Configuration

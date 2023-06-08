@@ -9,7 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/goava/di"
+	"github.com/defval/di"
 )
 
 func main() {

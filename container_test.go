@@ -11,7 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/goava/di"
+	"github.com/defval/di"
 )
 
 func init() {
