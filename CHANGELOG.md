@@ -8,6 +8,12 @@ project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html): TBD, use
 modules or another vendor system.
 
+## v1.12.0
+
+### Changed
+
+- Update package name
+
 ## v1.11.1
 
 ### Fixed
