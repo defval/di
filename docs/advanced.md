@@ -2,6 +2,7 @@
 
 - [Modules](#modules)
 - [Tags](#tags)
+- [ProvideValue](#providevalue)
 - [Optional Parameters](#optional-parameters)
 - [Struct Field Injection](#struct-field-injection)
 - [Iteration](#iteration)
@@ -99,6 +100,39 @@ value:
 ```go
 var db []*Database
 di.Resolve(&db, di.Tags{"type": "*"})
+```
+
+### ProvideValue
+
+Instead of using `di.Provide` to provide a constructor, you can use `di.ProvideValue` and provide values directly.
+This is useful to provide primitive values or values that are easily constructed. You can combine this with the use
+of `di.Tags` if you have multiple values of the same type and want to identify each one.
+
+```go
+di.New(
+    di.ProvideValue(time.Duration(10*time.Second), di.Tags{"name": "http-timeout"}),
+)
+
+var timeout time.Duration
+c.Resolve(&timeout, di.Tags{"name": "http-timeout"})
+```
+
+To differentiate between multiple values of the same type, you can also use golang type aliases instead of using
+`di.Tags`.
+
+```go
+type ProjectName string
+type ProjectVersion string
+
+c, err := di.New(
+    di.ProvideValue(ProjectName("my-project")),
+    di.ProvideValue(ProjectVersion("1.0.0")),
+)
+
+var pn ProjectName
+c.Resolve(&pn)
+var pv ProjectVersion
+c.Resolve(&pv)
 ```
 
 ### Optional Parameters
