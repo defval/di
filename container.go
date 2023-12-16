@@ -118,6 +118,29 @@ func (c *Container) Invoke(invocation Invocation, options ...InvokeOption) error
 	return nil
 }
 
+// OptionsFactory is a function whose signature looks like:
+//
+//		func ProvideOptionalDependencies(cfg Configuration) ([]di.Option, error) {
+//			if cfg.backupEnabled {
+//				return []di.Option{
+//					di.Provide(Backup{}),
+//				}, nil
+//			}
+//			return nil, nil
+//	 }
+//
+// It returns some di.Option to be applied to the container. The function can return an optional error.
+// Error will be returned as is.
+type OptionsFactory interface{}
+
+// ProvideValue provides value as is.
+func (c *Container) ProvideOptions(fn OptionsFactory, options ...ProvideOption) error {
+	if err := c.provideOptions(fn, options...); err != nil {
+		return errWithStack(err)
+	}
+	return nil
+}
+
 type Pointer interface{}
 
 // Has checks that type exists in container, if not it return false.
@@ -234,6 +257,12 @@ func (c *Container) apply(di diopts) error {
 			return fmt.Errorf("%s: %w", resolve.frame, err)
 		}
 	}
+	// process di.ProvideOptions() diopts
+	for _, provideOptions := range di.provideOptions {
+		if err := c.provideOptions(provideOptions.fn, provideOptions.options...); err != nil {
+			return fmt.Errorf("%s: %w", provideOptions.frame, err)
+		}
+	}
 	return nil
 }
 
@@ -277,6 +306,49 @@ func (c *Container) provideValue(value Value, options ...ProvideOption) error {
 		decorators: params.Decorators,
 	}
 	return c.provideNode(n, params)
+}
+
+func (c *Container) provideOptions(factory OptionsFactory, options ...ProvideOption) error {
+	if factory == nil {
+		return fmt.Errorf("%w, got %s", errInvalidOptionsFactorySignature, "nil")
+	}
+	fn, valid := inspectFunction(factory)
+	if !valid {
+		return fmt.Errorf("%w, got %s", errInvalidOptionsFactorySignature, reflect.TypeOf(factory))
+	}
+	if !validateOptionsFactory(fn) {
+		return fmt.Errorf("%w, got %s", errInvalidOptionsFactorySignature, reflect.TypeOf(factory))
+	}
+	nodes, err := parseInvocationParameters(fn, c.schema)
+	if err != nil {
+		return err
+	}
+	var args []reflect.Value
+	for _, node := range nodes {
+		if err := c.schema.prepare(node); err != nil {
+			return err
+		}
+		v, err := node.Value(c.schema)
+		if err != nil {
+			return fmt.Errorf("%s: %s", node, err)
+		}
+		args = append(args, v)
+	}
+	res := funcResult(fn.Call(args))
+	opts := res[0].Interface().([]Option)
+	if len(res) == 2 {
+		err = res.error(1)
+		if err != nil {
+			return err
+		}
+	}
+	for _, opt := range opts {
+		err = c.Apply(opt)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (c *Container) provideNode(n *node, params ProvideParams) error {
@@ -390,4 +462,6 @@ type diopts struct {
 	invokes []invokeOptions
 	// Array of di.Resolve() options.
 	resolves []resolveOptions
+	// Array of di.ProvideOptions() options.
+	provideOptions []provideOptionsOptions
 }

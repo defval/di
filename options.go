@@ -38,6 +38,17 @@ func ProvideValue(value Value, options ...ProvideOption) Option {
 	})
 }
 
+func ProvideOptions(factory OptionsFactory, options ...ProvideOption) Option {
+	frame := stacktrace(0)
+	return option(func(c *diopts) {
+		c.provideOptions = append(c.provideOptions, provideOptionsOptions{
+			frame,
+			factory,
+			options,
+		})
+	})
+}
+
 // Constructor is a function with follow signature:
 //
 //	func NewHTTPServer(addr string, handler http.Handler) (server *http.Server, cleanup func(), err error) {
@@ -290,4 +301,10 @@ type resolveOptions struct {
 	frame   callerFrame
 	target  Pointer
 	options []ResolveOption
+}
+
+type provideOptionsOptions struct {
+	frame   callerFrame
+	fn      OptionsFactory
+	options []ProvideOption
 }

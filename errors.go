@@ -11,9 +11,10 @@ var (
 )
 
 var (
-	errInvalidInvocationSignature = errors.New("invalid invocation signature")
-	errCycleDetected              = errors.New("cycle detected")
-	errFieldsNotSupported         = errors.New("fields not supported")
+	errInvalidInvocationSignature     = errors.New("invalid invocation signature")
+	errInvalidOptionsFactorySignature = errors.New("invalid options factory signature")
+	errCycleDetected                  = errors.New("cycle detected")
+	errFieldsNotSupported             = errors.New("fields not supported")
 )
 
 // knownError return true if err is library known error.
